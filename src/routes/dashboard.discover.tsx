@@ -296,6 +296,7 @@ function DiscoverPage() {
 
   const applyToJob = async (job: Job) => {
     if (!user?.uid) return toast.error("Log in to apply");
+    if (user?.role !== "candidate") return toast.error("Only candidate accounts can apply");
     if (!db) return toast.error("Firestore is not configured");
     if (appliedIds.has(job.id)) {
       toast.info("You already applied to this job");
@@ -541,10 +542,14 @@ function DiscoverPage() {
                         <Badge variant="secondary" className="text-xs">
                           Applied
                         </Badge>
-                      ) : (
+                      ) : user?.role === "candidate" ? (
                         <Button variant="hero" size="sm" onClick={() => applyToJob(job)}>
                           Apply <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
                         </Button>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          Candidate accounts only
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -630,7 +635,7 @@ function DiscoverPage() {
                 <Button
                   variant="hero"
                   className="flex-1"
-                  disabled={appliedIds.has(activeJob.id)}
+                  disabled={appliedIds.has(activeJob.id) || user?.role !== "candidate"}
                   onClick={() => applyToJob(activeJob)}
                 >
                   {appliedIds.has(activeJob.id) ? "Applied ✓" : "Apply Now"}

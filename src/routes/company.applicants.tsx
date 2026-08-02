@@ -480,13 +480,15 @@ function ApplicantsPage() {
                 </div>
               )}
 
-              {profile.resumeUrl && (
-                <Button variant="outline" asChild className="w-full">
-                  <a href={profile.resumeUrl} target="_blank" rel="noreferrer">
-                    <FileText className="mr-2 h-4 w-4" /> Open Resume
-                  </a>
-                </Button>
-              )}
+              {profile.resumeUrl &&
+                (profile.resumeUrl.startsWith("http://") ||
+                  profile.resumeUrl.startsWith("https://")) && (
+                  <Button variant="outline" asChild className="w-full">
+                    <a href={profile.resumeUrl} target="_blank" rel="noreferrer">
+                      <FileText className="mr-2 h-4 w-4" /> Open Resume
+                    </a>
+                  </Button>
+                )}
 
               <DialogFooter className="sm:justify-between">
                 <Button
