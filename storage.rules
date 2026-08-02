@@ -1,0 +1,51 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdminOrCompany() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'company'];
+    }
+
+    // RESUME UPLOADS (max 20MB — matches the analyzer UI copy)
+    // Content-type allowlist is deliberately broad: browsers report .md as
+    // text/markdown, .doc/.docx as application/octet-stream or application/zip.
+    match /resumes/{userId}/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId)
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType.matches('application/pdf|text/plain|text/markdown|application/msword|application/vnd.openxmlformats-officedocument.wordprocessingml.document|application/octet-stream|application/zip');
+    }
+    
+    // PROFILE IMAGES
+    match /profiles/{userId}/{fileName} {
+      // Anyone logged in can see profile images, only the owner can upload
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+                   && request.resource.contentType.matches('image/.*');
+    }
+    
+    // PORTFOLIO IMAGES (max 10MB)
+    match /portfolios/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId)
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+    
+    // PUBLIC ASSETS (e.g., Company Logos)
+    // Only admins and companies may write public assets; anyone may read them.
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdminOrCompany();
+    }
+  }
+}

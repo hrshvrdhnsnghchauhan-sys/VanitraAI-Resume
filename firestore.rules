@@ -1,0 +1,177 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isAuthenticated() && u != null && u.data.role == 'admin';
+    }
+
+    function isCompany() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isAuthenticated() && u != null && u.data.role == 'company';
+    }
+    
+    // USERS
+    // Users may read and create their own profile, and update it — but can
+    // NEVER change their own role (prevents self-escalation to admin/company).
+    // The create rule also rejects the admin role at creation time (candidate
+    // and company are allowed — company signup creates a company-role doc), so
+    // a crafted create (e.g. self-heal when a doc is missing) cannot escalate.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.role in ['candidate', 'company'] || isAdmin();
+      allow update: if isOwner(userId) && request.resource.data.role == resource.data.role || isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // COMPANIES
+    // Company profiles may contain contact info — only the owning company
+    // (uid == companyId) and admins may read them. Candidates see jobs, which
+    // carry the company name inline, so no candidate read is required.
+    match /companies/{companyId} {
+      allow read: if isOwner(companyId) || isAdmin();
+      allow write: if isOwner(companyId) || isAdmin();
+    }
+    
+    // JOBS
+    // Companies may only create/update/delete their OWN job postings.
+    match /jobs/{jobId} {
+      allow read: if isAuthenticated();
+      allow create: if isCompany() && request.resource.data.companyId == request.auth.uid || isAdmin();
+      allow update: if isCompany() && resource.data.companyId == request.auth.uid || isAdmin();
+      allow delete: if isCompany() && resource.data.companyId == request.auth.uid || isAdmin();
+    }
+    
+    // APPLICATIONS
+    match /applications/{applicationId} {
+      allow create: if isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'candidate' && request.resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.userId == request.auth.uid || 
+        resource.data.companyId == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isAuthenticated() && resource != null && (resource.data.companyId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    // PAYMENTS & SUBSCRIPTIONS
+    match /subscriptions/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+    // Financial records may only be created by the owner (never spoofed),
+    // read by the owner or admin, and modified only by admins.
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+    match /billingHistory/{historyId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+    match /paymentLogs/{logId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+    
+    // NOTIFICATIONS
+    // Users may read global/admin broadcasts and their own; only the owner or
+    // an admin may write (closes the spam-any-userId create hole). The
+    // workspace-init default doc (notifications/{uid} with no userId field) is
+    // owned via its doc ID, so notifId == request.auth.uid is also accepted.
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || resource.data.userId == "global" || resource.data.userId == "admin" || isAdmin());
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || notifId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || notifId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    // SETTINGS
+    // Users may only read/write their OWN settings (doc id == their uid);
+    // admins may read/write any (including the platform-wide doc).
+    match /settings/{settingId} {
+      allow read: if isOwner(settingId) || isAdmin();
+      allow write: if isAdmin() || isOwner(settingId);
+    }
+    
+    // RESUMES
+    match /resumes/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+      
+      // Allow subcollections (like history)
+      match /{document=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // RESUME VERSION HISTORY (explicit block for clarity)
+    // Users may only read/write their OWN version history. The version docs
+    // mirror the resume snapshot (data, atsScore, completion, keywords,
+    // source, isFavorite, deletedAt) — no cross-user access, admins only.
+    match /resumes/{userId}/history/{versionId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    
+    // ANALYSIS
+    match /analysis/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    
+    // JOB MATCHES
+    match /jobMatches/{matchId} {
+      allow read, write: if isAuthenticated() && (
+        resource == null || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isAdmin()
+      );
+    }
+    
+    // LEARNING ROADMAPS
+    match /learningRoadmaps/{roadmapId} {
+      allow read, write: if isAuthenticated() && (
+        resource == null || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isAdmin()
+      );
+    }
+    
+    // COVER LETTERS
+    // Letters belong to the candidate who created them; admins may read/delete.
+    match /coverLetters/{letterId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource != null && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // ACTIVITY LOGS
+    match /activityLogs/{logId} {
+      allow read, create: if isAuthenticated() && (
+        resource == null || resource.data.userId == request.auth.uid || request.resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+    
+    // COUPONS
+    // Coupon codes are validated server-side against the payment gateway; the
+    // Firestore copy is a read-only mirror for the billing UI (and a place for
+    // admins to publish codes). Only admins may write them.
+    match /coupons/{couponId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
