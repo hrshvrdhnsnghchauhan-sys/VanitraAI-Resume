@@ -17,7 +17,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { db } from "@/services/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
-import { SAMPLE_RESUME, type ResumeData } from "@/lib/resume-templates";
+import { type ResumeData } from "@/lib/resume-templates";
 import {
   autosaveVersion,
   duplicateVersion,
@@ -40,16 +40,17 @@ export const Route = createFileRoute("/dashboard/versions")({
 });
 
 function toResumeData(d: Record<string, unknown>): ResumeData {
+  // Real stored values only — never fall back to sample content.
   return {
-    name: (d.name as string) ?? SAMPLE_RESUME.name,
-    title: (d.title as string) ?? SAMPLE_RESUME.title,
-    email: (d.email as string) ?? SAMPLE_RESUME.email,
-    phone: (d.phone as string) ?? SAMPLE_RESUME.phone,
+    name: (d.name as string) ?? "",
+    title: (d.title as string) ?? "",
+    email: (d.email as string) ?? "",
+    phone: (d.phone as string) ?? "",
     location: (d.location as string) ?? "",
     website: (d.website as string) ?? "",
     linkedin: (d.linkedin as string) ?? "",
-    summary: (d.summary as string) ?? SAMPLE_RESUME.summary,
-    skills: (d.skills as string) ?? SAMPLE_RESUME.skills,
+    summary: (d.summary as string) ?? "",
+    skills: (d.skills as string) ?? "",
     experiences: (d.experiences as ResumeData["experiences"]) ?? [],
     education: (d.education as ResumeData["education"]) ?? [],
     projects: (d.projects as ResumeData["projects"]) ?? [],
@@ -59,11 +60,15 @@ function toResumeData(d: Record<string, unknown>): ResumeData {
   };
 }
 
+// Blank resume used only as a placeholder before real data arrives —
+// never sample content, so nothing fictional can be saved or restored.
+const EMPTY_RESUME: ResumeData = toResumeData({});
+
 function VersionsPage() {
   const { user, loading: authLoading, tokenReady } = useAuth();
   const uid = user?.uid;
 
-  const [data, setData] = useState<ResumeData>(SAMPLE_RESUME);
+  const [data, setData] = useState<ResumeData>(EMPTY_RESUME);
   const [hasResume, setHasResume] = useState(false);
   const [versions, setVersions] = useState<ResumeVersion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +145,7 @@ function VersionsPage() {
           }
         } else {
           setHasResume(false);
-          setData(SAMPLE_RESUME);
+          setData(EMPTY_RESUME);
         }
         setLoading(false);
       },

@@ -30,6 +30,8 @@ function AdminDashboardHome() {
         applications: appsSnap.size,
       };
 
+      // Real user-growth: bucket actual users by the month they signed up
+      // (createdAt), for the last 6 months. No simulated numbers.
       const months = [
         "Jan",
         "Feb",
@@ -44,20 +46,27 @@ function AdminDashboardHome() {
         "Nov",
         "Dec",
       ];
-      const d = new Date();
-      const currentMonthIdx = d.getMonth();
-
-      const growthData = [];
-      let currUsers = usersSnap.size;
-      for (let i = 0; i < 6; i++) {
-        let mIdx = currentMonthIdx - i;
-        if (mIdx < 0) mIdx += 12;
-        growthData.unshift({
-          name: months[mIdx],
-          users: currUsers,
+      const now = new Date();
+      const buckets: { key: string; label: string; users: number }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        buckets.push({
+          key: `${d.getFullYear()}-${d.getMonth()}`,
+          label: months[d.getMonth()],
+          users: 0,
         });
-        currUsers = Math.floor(currUsers * (0.8 + Math.random() * 0.1));
       }
+
+      usersSnap.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        const ts = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+        if (!ts) return;
+        const key = `${ts.getFullYear()}-${ts.getMonth()}`;
+        const bucket = buckets.find((b) => b.key === key);
+        if (bucket) bucket.users += 1;
+      });
+
+      const growthData = buckets.map(({ label, users }) => ({ name: label, users }));
 
       return { stats, growth: growthData };
     },

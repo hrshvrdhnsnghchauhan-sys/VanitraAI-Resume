@@ -25,23 +25,17 @@ function AdminMonitoringPage() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
+        // Real measurement: time an actual Firestore read (no simulation).
         const start = performance.now();
         await getDocs(query(collection(db, "users"), limit(1)));
         const end = performance.now();
         const ping = Math.round(end - start);
         setDbStatus(ping < 200 ? "Healthy" : "Degraded");
 
-        // Generate simulated recent latency based on current ping
+        // Keep a rolling window of the last 20 real samples (one per poll).
         const now = new Date();
-        const data = [];
-        for (let i = 20; i >= 0; i--) {
-          const t = new Date(now.getTime() - i * 60000);
-          data.push({
-            time: `${t.getHours()}:${t.getMinutes().toString().padStart(2, "0")}`,
-            ms: Math.floor(Math.random() * 50) + (ping > 200 ? 150 : 40),
-          });
-        }
-        setLatencyData(data);
+        const label = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
+        setLatencyData((prev) => [...prev.slice(-19), { time: label, ms: ping }]);
       } catch (err) {
         setDbStatus("Offline");
       }
@@ -89,7 +83,7 @@ function AdminMonitoringPage() {
         />
       </div>
 
-      <DashCard title="API Latency (Last 20 minutes)">
+      <DashCard title="Firestore Read Latency (live samples)">
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={latencyData} margin={{ left: -20, right: 10, top: 10 }}>

@@ -20,15 +20,6 @@ function getStripe(): Stripe | null {
   return new Stripe(secretKey);
 }
 
-function isDemoKeys(): boolean {
-  const rzp = process.env.RAZORPAY_KEY_ID || "";
-  const rzpSecret = process.env.RAZORPAY_KEY_SECRET || "";
-  const stripeKey = process.env.STRIPE_SECRET_KEY || "";
-  const rzpConfigured = !!(rzp && rzpSecret && !rzp.includes("placeholder"));
-  const stripeConfigured = !!(stripeKey && !stripeKey.includes("placeholder"));
-  return !rzpConfigured && !stripeConfigured;
-}
-
 // ---------------------------------------------------------------------------
 // Razorpay (India — primary)
 // ---------------------------------------------------------------------------
@@ -38,17 +29,8 @@ export const createRazorpayOrderFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const razorpay = getRazorpay();
-      // Demo mode: only when NO gateway keys are configured at all. If some
-      // gateway is configured but Razorpay specifically isn't, fail closed.
       if (!razorpay) {
-        if (isDemoKeys()) {
-          return {
-            success: true,
-            orderId: `order_demo_${Date.now()}`,
-            amount: Math.round(data.amount * 100),
-            isDemo: true,
-          };
-        }
+        // Fail closed: real payment attempts must never silently succeed.
         return { success: false, error: "Razorpay is not configured for this plan." };
       }
 
@@ -79,12 +61,8 @@ export const createRazorpaySubscriptionFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const razorpay = getRazorpay();
-      // Demo mode: only when NO gateway keys are configured at all. If some
-      // gateway is configured but Razorpay specifically isn't, fail closed.
       if (!razorpay) {
-        if (isDemoKeys()) {
-          return { success: true, subscriptionId: `sub_demo_${Date.now()}`, isDemo: true };
-        }
+        // Fail closed: real payment attempts must never silently succeed.
         return { success: false, error: "Razorpay is not configured for this plan." };
       }
 
@@ -131,18 +109,6 @@ export const verifyRazorpaySignatureFn = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     try {
-      // Demo ids/signatures are ONLY accepted when no gateway keys are
-      // configured — with real keys, a crafted demo signature must never pass
-      // verification (defense in depth on top of the owner-scoped Firestore
-      // writes).
-      if (
-        isDemoKeys() &&
-        (data.razorpay_subscription_id?.startsWith("sub_demo_") ||
-          data.razorpay_order_id?.startsWith("order_demo_") ||
-          data.razorpay_signature === "demo_signature")
-      ) {
-        return { success: true, isDemo: true };
-      }
       const secret = process.env.RAZORPAY_KEY_SECRET || "";
 
       // Without either an order or subscription id there is nothing to verify
@@ -176,9 +142,7 @@ export const cancelRazorpaySubscriptionFn = createServerFn({ method: "POST" })
     try {
       const razorpay = getRazorpay();
       if (!razorpay) {
-        return isDemoKeys()
-          ? { success: true, isDemo: true }
-          : { success: false, error: "Razorpay is not configured." };
+        return { success: false, error: "Razorpay is not configured." };
       }
       await razorpay.subscriptions.cancel(data.subscriptionId);
       return { success: true };
@@ -208,12 +172,8 @@ export const createStripeCheckoutSessionFn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const stripe = getStripe();
-      // Demo mode: only when NO gateway keys are configured at all. If some
-      // gateway is configured but Stripe specifically isn't, fail closed.
       if (!stripe) {
-        if (isDemoKeys()) {
-          return { success: true, sessionId: `cs_demo_${Date.now()}`, isDemo: true };
-        }
+        // Fail closed: real payment attempts must never silently succeed.
         return { success: false, error: "Stripe is not configured for this plan." };
       }
 
@@ -266,10 +226,6 @@ export const verifyStripeSessionFn = createServerFn({ method: "POST" })
     try {
       const stripe = getStripe();
       if (!stripe) {
-        // Demo mode — accept demo session ids so local testing still works.
-        if (isDemoKeys() && data.sessionId.startsWith("cs_demo_")) {
-          return { success: true, isDemo: true };
-        }
         return { success: false, error: "Stripe is not configured." };
       }
 
@@ -312,9 +268,7 @@ export const cancelStripeSubscriptionFn = createServerFn({ method: "POST" })
     try {
       const stripe = getStripe();
       if (!stripe) {
-        return isDemoKeys()
-          ? { success: true, isDemo: true }
-          : { success: false, error: "Stripe is not configured." };
+        return { success: false, error: "Stripe is not configured." };
       }
       // Cancel at the end of the billing period by default (graceful).
       await stripe.subscriptions.update(data.subscriptionId, { cancel_at_period_end: true });
@@ -341,15 +295,8 @@ export const validateCouponFn = createServerFn({ method: "POST" })
         const code = rawCode.toUpperCase();
         const razorpay = getRazorpay();
         if (!razorpay) {
-          // Demo coupons so the flow is testable without live keys.
-          const demo = ["WELCOME10", "FIRST20", "SAVE15"].includes(code);
-          return demo
-            ? {
-                valid: true,
-                code,
-                percentOff: code === "FIRST20" ? 20 : code === "SAVE15" ? 15 : 10,
-              }
-            : { valid: false, message: "Invalid coupon code." };
+          // Fail closed: coupons can only be validated against a live gateway.
+          return { valid: false, message: "Coupon validation is unavailable right now." };
         }
         const coupon: any = await (razorpay as any).coupons.fetch(code);
         if (!coupon || coupon.state === "expired") {
@@ -367,11 +314,8 @@ export const validateCouponFn = createServerFn({ method: "POST" })
       // try the exact input first, then the uppercased variant.
       const stripe = getStripe();
       if (!stripe) {
-        const code = rawCode.toUpperCase();
-        const demo = ["WELCOME10", "FIRST20", "SAVE15"].includes(code);
-        return demo
-          ? { valid: true, code, percentOff: code === "FIRST20" ? 20 : code === "SAVE15" ? 15 : 10 }
-          : { valid: false, message: "Invalid coupon code." };
+        // Fail closed: coupons can only be validated against a live gateway.
+        return { valid: false, message: "Coupon validation is unavailable right now." };
       }
       let coupon;
       try {

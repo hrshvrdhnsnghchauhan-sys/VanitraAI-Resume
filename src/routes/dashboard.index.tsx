@@ -65,8 +65,9 @@ function DashboardHome() {
     setIsLoading(true);
 
     let apps: any[] = [];
-    let rScore = 78;
-    let aScore = 72;
+    // Real scores only — start at 0 until a real analysis document exists.
+    let rScore = 0;
+    let aScore = 0;
     let historyDocs: any[] = [];
 
     const updateDashboardState = () => {
@@ -87,19 +88,18 @@ function DashboardHome() {
       let trendData = [];
 
       if (historyDocs.length > 0) {
-        trendData = historyDocs.map((h, i) => {
+        // Real score trend: use each version's actual stored ATS/resume score.
+        trendData = historyDocs.map((h) => {
           const date = h.createdAt?.toDate ? h.createdAt.toDate() : new Date();
-          const simulatedScore = Math.max(0, rScore - (historyDocs.length - 1 - i) * 5);
+          const score = h.atsScore ?? h.resumeScore ?? h.score ?? 0;
           return {
             name: `${months[date.getMonth()]} ${date.getDate()}`,
-            score: simulatedScore,
+            score,
           };
         });
       } else {
-        trendData = [
-          { name: "Start", score: Math.max(0, rScore - 10) },
-          { name: "Current", score: rScore },
-        ];
+        // No saved versions yet — only show the current real score, no fake dip.
+        trendData = [{ name: "Current", score: rScore }];
       }
 
       setData({
@@ -120,14 +120,14 @@ function DashboardHome() {
           },
           {
             label: "Jobs Matched",
-            value: apps.filter((a) => (a.match || 0) > 80).length || 15,
+            value: apps.filter((a) => (a.match || 0) > 80).length,
             suffix: "",
             trend: "80%+ match",
             color: "chart-2",
           },
           {
             label: "Applications",
-            value: apps.length || 4,
+            value: apps.length,
             suffix: "",
             trend: "Active",
             color: "chart-4",

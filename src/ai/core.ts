@@ -1,4 +1,31 @@
 import { createServerFn } from "@tanstack/react-start";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/services/firebase";
+import { auth } from "@/services/firebase";
+
+/**
+ * Record a real AI-usage event (client-side, owner-scoped) so the admin AI
+ * Usage page shows actual request counts instead of estimates. Fire-and-forget;
+ * never blocks or fails the AI call itself.
+ */
+function logAiUsage(type: string, extra: Record<string, unknown> = {}): void {
+  try {
+    if (typeof window === "undefined") return;
+    const uid = auth?.currentUser?.uid;
+    if (!uid || !db) return;
+    void setDoc(
+      doc(db, "aiUsage", `${uid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+      {
+        userId: uid,
+        type,
+        createdAt: serverTimestamp(),
+        ...extra,
+      },
+    );
+  } catch {
+    /* never block the AI call on a logging failure */
+  }
+}
 
 // Use standard JSON types
 export interface ResumeAnalysisResult {
@@ -195,8 +222,7 @@ function getGeminiApiKey(): string {
   // SECURITY: never read the key from a VITE_* import.meta.env variable in
   // code that ships to the browser — Vite statically inlines those literals
   // into the client bundle, leaking the secret. Only the server runtime
-  // (process.env / SSR import.meta.env) may hold the key; browsers get "" and
-  // gracefully fall back to the offline high-quality fallback responses.
+  // (process.env / SSR import.meta.env) may hold the key; browsers get "".
   if (typeof process !== "undefined" && process.env) {
     if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
     if (process.env.VITE_GEMINI_API_KEY) return process.env.VITE_GEMINI_API_KEY;
@@ -207,266 +233,20 @@ function getGeminiApiKey(): string {
   return "";
 }
 
-function getFallbackAiResponse<T>(prompt: string): T {
-  if (prompt.includes("ATS scoring") || prompt.includes("score:") || prompt.includes("atsScore:")) {
-    return {
-      score: 88,
-      atsScore: 92,
-      grammar: [
-        "Strong use of active voice across bullet points.",
-        "No grammatical or spelling errors detected.",
-      ],
-      formatting: [
-        "Consistent date formatting",
-        "Clear section headers",
-        "Appropriate use of bullet points and whitespace",
-      ],
-      keywords: [
-        "React",
-        "TypeScript",
-        "Node.js",
-        "System Architecture",
-        "CI/CD",
-        "AWS",
-        "Performance Optimization",
-      ],
-      missingSkills: ["Kubernetes", "GraphQL", "Distributed Systems"],
-      suggestions: [
-        "Quantify 2-3 more bullet points with specific metrics (e.g., percentage improvements, dollar savings).",
-        "Add a Dedicated Projects section to showcase open-source contributions.",
-        "Include links to GitHub and LinkedIn in the contact header.",
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("Compare this resume to the job description")) {
-    return {
-      matchPercentage: 86,
-      skillMatch: 90,
-      experienceMatch: 85,
-      educationMatch: 95,
-      missingKeywords: ["Docker", "Agile", "AWS CloudFormation"],
-      missingSkills: ["Kubernetes", "Microservices Architecture"],
-      selectionProbability: "High",
-      salaryPrediction: "$125,000 - $145,000 / year",
-      recommendations: [
-        "Incorporate keywords from the job posting into your Professional Summary.",
-        "Highlight your leadership experience in agile sprints.",
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("learning roadmap") || prompt.includes("Create a learning roadmap")) {
-    return {
-      skillGaps: ["Advanced Cloud Deployment", "Kubernetes Orchestration", "System Scalability"],
-      weeklyPlan: [
-        {
-          week: 1,
-          focus: "Cloud Architecture & Containerization",
-          tasks: [
-            "Complete Docker deep-dive tutorial",
-            "Containerize existing full-stack application",
-            "Learn Kubernetes Pods, Services, and Deployments",
-          ],
-        },
-        {
-          week: 2,
-          focus: "CI/CD & DevOps Automation",
-          tasks: [
-            "Set up GitHub Actions workflow for automated testing",
-            "Configure AWS Elastic Container Service (ECS) deployment",
-            "Implement infrastructure monitoring with Prometheus",
-          ],
-        },
-        {
-          week: 3,
-          focus: "System Scalability & Performance",
-          tasks: [
-            "Analyze database query bottlenecks",
-            "Add Redis caching layer to API endpoints",
-            "Benchmark load testing with k6",
-          ],
-        },
-        {
-          week: 4,
-          focus: "Portfolio Polish & Interview Readiness",
-          tasks: [
-            "Document cloud architecture diagrams in README",
-            "Practice 5 system design interview scenarios",
-            "Refine resume bullets with quantified impact",
-          ],
-        },
-      ],
-      resources: [
-        {
-          title: "AWS Certified Solutions Architect",
-          platform: "Coursera",
-          url: "https://coursera.org",
-        },
-        { title: "Kubernetes for Developers", platform: "Udemy", url: "https://udemy.com" },
-        { title: "System Design Interview Primer", platform: "GitHub", url: "https://github.com" },
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("Technical") && prompt.includes("Behavioral") && prompt.includes("Coding")) {
-    return {
-      Technical: [
-        "Explain the differences between REST and GraphQL APIs and when to use each.",
-        "How do you optimize a React application that is suffering from unnecessary re-renders?",
-        "Describe your approach to designing a fault-tolerant microservice architecture.",
-        "What are the trade-offs between SQL and NoSQL databases for high-throughput applications?",
-        "How do you handle authentication and authorization securely in a modern web app?",
-      ],
-      Behavioral: [
-        "Tell me about a time you had to deliver a critical project under a tight deadline.",
-        "How do you handle disagreements on technical architecture with peer developers?",
-        "Describe a situation where you proactively identified and resolved a production issue.",
-        "Give an example of how you mentored a junior team member.",
-        "Tell me about a project that failed and what you learned from the experience.",
-      ],
-      "Project-Based": [
-        "Walk me through the architecture of the most complex system listed on your resume.",
-        "What was the most challenging bug you encountered in your recent project and how did you debug it?",
-        "How did you measure performance improvements in your analytics dashboard project?",
-      ],
-      Scenario: [
-        "If a production database suddenly experiences 10x normal traffic, how would you stabilize the system?",
-        "How would you migrate a legacy monolith to microservices with zero downtime?",
-      ],
-      Coding: [
-        "Implement an LRU Cache with O(1) get and put operations.",
-        "Write a function to throttle or debounce high-frequency API requests.",
-        "Design an algorithm to find the shortest path in a network graph.",
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("Rewrite this resume section")) {
-    return {
-      rewrittenText:
-        "• Spearheaded end-to-end frontend and backend architecture, boosting application performance by 40% and cutting latency for 10,000+ daily active users.",
-      improvements: [
-        "Replaced weak verbs with powerful action verbs ('Spearheaded', 'boosting')",
-        "Quantified impact with specific metrics (40% performance boost, 10,000+ users)",
-        "Aligned phrasing with ATS keywords",
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("market demand in tech")) {
-    return {
-      missing: [
-        { name: "Kubernetes", priority: "High", progress: 40 },
-        { name: "GraphQL", priority: "Medium", progress: 60 },
-        { name: "AWS Security", priority: "High", progress: 35 },
-      ],
-      radar: [
-        { skill: "React / Frontend", you: 90, market: 85 },
-        { skill: "Node.js / Backend", you: 85, market: 85 },
-        { skill: "Cloud / AWS", you: 75, market: 90 },
-        { skill: "System Design", you: 80, market: 85 },
-        { skill: "DevOps / CI/CD", you: 70, market: 80 },
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("cover letter") || prompt.includes("compelling cover letter")) {
-    return {
-      coverLetter: `Dear Hiring Manager,
-
-I am writing to express my enthusiastic interest in the opportunity with your engineering team. With a strong background in building scalable web applications, optimizing full-stack systems, and collaborating in fast-paced environments, I am confident in my ability to make an immediate positive impact.
-
-In my recent experience, I have successfully led end-to-end development initiatives that improved system performance by 40% and enhanced user engagement across thousands of active users. My expertise in React, TypeScript, Node.js, and cloud infrastructure aligns closely with the technical requirements and mission of your team.
-
-I would welcome the opportunity to discuss how my technical skills, proactive problem-solving, and dedication to engineering excellence can contribute to your upcoming projects. Thank you for your time and consideration.
-
-Sincerely,
-[Your Name]`,
-    } as unknown as T;
-  }
-  if (prompt.includes("Predict the market salary") || prompt.includes("market salary")) {
-    return {
-      estimatedSalary: "$115,000 - $145,000 USD / year",
-      confidence: "High",
-      factors: [
-        "Demonstrated expertise in high-demand full-stack technologies",
-        "Quantified achievements showing direct business impact",
-        "Strong market demand for senior engineering roles",
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("Compare these two candidates")) {
-    return {
-      winner: "Candidate A",
-      reasoning:
-        "Candidate A exhibits stronger quantified achievements, deeper full-stack architecture experience, and higher ATS keyword alignment for this role.",
-      comparison: [
-        { category: "Technical Skills", candidateA: "92 / 100", candidateB: "85 / 100" },
-        { category: "Relevant Experience", candidateA: "90 / 100", candidateB: "82 / 100" },
-        { category: "Leadership & Mentoring", candidateA: "88 / 100", candidateB: "80 / 100" },
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("professional summary for a resume")) {
-    return {
-      text: "Results-driven engineering professional with 4+ years of experience architecting high-performance full-stack applications. Proven track record of optimizing system load times by 40% and scaling cloud solutions for thousands of active users.",
-    } as unknown as T;
-  }
-  if (prompt.includes("STAR-format resume bullet points")) {
-    return {
-      items: [
-        "• Architected scalable cloud infrastructure using AWS and Docker, improving system availability to 99.99% and reducing latency by 40%.",
-        "• Led cross-functional engineering initiatives, mentoring junior developers and cutting sprint delivery cycles by 25%.",
-        "• Integrated automated CI/CD pipelines and testing suites, decreasing production bugs by 50% across 10+ core microservices.",
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("achievement-focused resume lines")) {
-    return {
-      items: [
-        "• Reduced cloud operational infrastructure costs by 30% ($60k/yr) through proactive container optimization.",
-        "• Boosted platform user engagement by 45% following a comprehensive UI/UX overhaul and performance tuning.",
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("career objective for a resume")) {
-    return {
-      text: "Seeking to leverage extensive technical expertise and leadership skills to drive product innovation and scalable architecture as a Senior Lead Engineer.",
-    } as unknown as T;
-  }
-  if (prompt.includes("suggest") || prompt.includes("skills for role")) {
-    return {
-      items: [
-        "React",
-        "TypeScript",
-        "Node.js",
-        "GraphQL",
-        "AWS",
-        "Docker",
-        "Kubernetes",
-        "System Design",
-        "CI/CD",
-        "PostgreSQL",
-        "Next.js",
-        "Tailwind CSS",
-      ],
-    } as unknown as T;
-  }
-  if (prompt.includes("Extracted resume JSON")) {
-    // Offline import cleanup — no AI available; caller keeps the parsed data.
-    return {
-      data: null,
-      issues: ["AI cleanup unavailable — your parsed data was kept as-is."],
-      suggestions: [],
-    } as unknown as T;
-  }
-  return {
-    response:
-      "AI Analysis Complete: Your resume demonstrates strong technical foundations and quantified achievements. Ensure all bullet points highlight measurable business outcomes.",
-  } as unknown as T;
-}
-
-// Core Gemini Fetch Helper with Retry Logic & Intelligent Fallback
+/**
+ * Core Gemini fetch helper with exponential-backoff retry.
+ *
+ * There is deliberately NO simulated fallback: when the API key is missing or
+ * the upstream API fails after retries, the error is thrown so the UI can
+ * surface it to the user. A resume analysis that never happened must never be
+ * presented as if the AI produced it.
+ */
 async function callGeminiJson<T>(prompt: string, maxRetries = 2): Promise<T> {
   const apiKey = getGeminiApiKey();
   if (!apiKey || apiKey === "mock-api-key" || apiKey.startsWith("AQ.")) {
-    console.warn("Gemini API key is placeholder/oauth token, using high-quality AI fallback.");
-    return getFallbackAiResponse<T>(prompt);
+    throw new Error(
+      "AI service is not configured (missing Gemini API key). Add GEMINI_API_KEY to the server environment.",
+    );
   }
 
   const fetchWithBackoff = async (attempt: number): Promise<Response> => {
@@ -499,24 +279,18 @@ async function callGeminiJson<T>(prompt: string, maxRetries = 2): Promise<T> {
   try {
     const res = await fetchWithBackoff(0);
     if (!res.ok) {
-      console.warn(
-        `Gemini API returned ${res.status} ${res.statusText}. Switching to intelligent fallback.`,
-      );
-      return getFallbackAiResponse<T>(prompt);
+      throw new Error(`Gemini API returned ${res.status} ${res.statusText}`);
     }
 
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
-      return getFallbackAiResponse<T>(prompt);
+      throw new Error("Gemini API returned an empty response");
     }
     return JSON.parse(text) as T;
   } catch (err: any) {
-    console.warn(
-      "Gemini API call or JSON parse failed, using high-quality fallback:",
-      err?.message || err,
-    );
-    return getFallbackAiResponse<T>(prompt);
+    console.warn("Gemini API call failed:", err?.message || err);
+    throw err;
   }
 }
 
@@ -565,25 +339,35 @@ export const cleanupImportFn = createServerFn({ method: "POST" })
     return await callGeminiJson<ImportCleanupResult>(prompt);
   });
 
-// Client-facing AI Provider implementation with automatic fallback when server functions RPC is unavailable
+// Client-facing AI Provider implementation. Every method calls the secure
+// server function first; if the RPC layer is unavailable it retries the raw
+// Gemini call directly so the feature still works with a real API key.
 export class GeminiProvider {
   async analyzeResume(resumeText: string): Promise<ResumeAnalysisResult> {
     try {
-      return await analyzeResumeFn({ data: { resumeText } });
+      const res = await analyzeResumeFn({ data: { resumeText } });
+      logAiUsage("analyzeResume");
+      return res;
     } catch (err) {
-      console.warn("Server function analyzeResumeFn failed, using direct client fallback:", err);
+      console.warn("Server function analyzeResumeFn failed, retrying directly:", err);
       const prompt = `Analyze this resume and provide ATS scoring. Return ONLY valid JSON matching this schema: { score: number, atsScore: number, grammar: string[], formatting: string[], keywords: string[], missingSkills: string[], suggestions: string[] }\n\nResume:\n${resumeText}`;
-      return await callGeminiJson<ResumeAnalysisResult>(prompt);
+      const res = await callGeminiJson<ResumeAnalysisResult>(prompt);
+      logAiUsage("analyzeResume", { fallback: true });
+      return res;
     }
   }
 
   async matchJob(resumeText: string, jobDescription: string): Promise<JobMatchResult> {
     try {
-      return await matchJobFn({ data: { resumeText, jobDescription } });
+      const res = await matchJobFn({ data: { resumeText, jobDescription } });
+      logAiUsage("matchJob");
+      return res;
     } catch (err) {
-      console.warn("Server function matchJobFn failed, using direct client fallback:", err);
+      console.warn("Server function matchJobFn failed, retrying directly:", err);
       const prompt = `Compare this resume to the job description. Return ONLY valid JSON matching this schema: { matchPercentage: number, skillMatch: number, experienceMatch: number, educationMatch: number, missingKeywords: string[], missingSkills: string[], selectionProbability: "High" | "Medium" | "Low", recommendations: string[] }\n\nResume:\n${resumeText}\n\nJob Description:\n${jobDescription}`;
-      return await callGeminiJson<JobMatchResult>(prompt);
+      const res = await callGeminiJson<JobMatchResult>(prompt);
+      logAiUsage("matchJob", { fallback: true });
+      return res;
     }
   }
 
@@ -592,11 +376,15 @@ export class GeminiProvider {
     targetRole: string,
   ): Promise<CareerRoadmapResult> {
     try {
-      return await generateRoadmapFn({ data: { resumeText, targetRole } });
+      const res = await generateRoadmapFn({ data: { resumeText, targetRole } });
+      logAiUsage("roadmap");
+      return res;
     } catch (err) {
-      console.warn("Server function generateRoadmapFn failed, using direct client fallback:", err);
+      console.warn("Server function generateRoadmapFn failed, retrying directly:", err);
       const prompt = `Create a learning roadmap for this candidate targeting the role of ${targetRole}. Return ONLY valid JSON matching this schema: { skillGaps: string[], weeklyPlan: [{ week: number, focus: string, tasks: string[] }], resources: [{ title: string, platform: string, url: string }] }\n\nResume:\n${resumeText}`;
-      return await callGeminiJson<CareerRoadmapResult>(prompt);
+      const res = await callGeminiJson<CareerRoadmapResult>(prompt);
+      logAiUsage("roadmap", { fallback: true });
+      return res;
     }
   }
 
@@ -607,10 +395,7 @@ export class GeminiProvider {
     try {
       return await generateInterviewQuestionsFn({ data: { resumeText, jobTitle } });
     } catch (err) {
-      console.warn(
-        "Server function generateInterviewQuestionsFn failed, using direct client fallback:",
-        err,
-      );
+      console.warn("Server function generateInterviewQuestionsFn failed, retrying directly:", err);
       const prompt = `Generate 5 Technical, 5 Behavioral, 3 Project-Based, 2 Scenario, and 3 Coding interview questions for a ${jobTitle} based on this resume. Return ONLY valid JSON matching: { "Technical": string[], "Behavioral": string[], "Project-Based": string[], "Scenario": string[], "Coding": string[] }\n\nResume:\n${resumeText}`;
       return await callGeminiJson<InterviewQuestionsResult>(prompt);
     }
@@ -620,7 +405,7 @@ export class GeminiProvider {
     try {
       return await rewriteResumeFn({ data: { sectionText } });
     } catch (err) {
-      console.warn("Server function rewriteResumeFn failed, using direct client fallback:", err);
+      console.warn("Server function rewriteResumeFn failed, retrying directly:", err);
       const prompt = `Rewrite this resume section to be highly professional, impactful, and ATS friendly. Quantify achievements where possible. Return ONLY valid JSON matching: { rewrittenText: string, improvements: string[] }\n\nSection:\n${sectionText}`;
       return await callGeminiJson<RewriteResult>(prompt);
     }
@@ -630,7 +415,7 @@ export class GeminiProvider {
     try {
       return await analyzeSkillGapFn({ data: { skillsList } });
     } catch (err) {
-      console.warn("Server function analyzeSkillGapFn failed, using direct client fallback:", err);
+      console.warn("Server function analyzeSkillGapFn failed, retrying directly:", err);
       const prompt = `Analyze these skills against current market demand in tech. Return ONLY valid JSON matching: { missing: [{ name: string, priority: "High"|"Medium"|"Low", progress: number }], radar: [{ skill: string, you: number, market: number }] }\n\nSkills:\n${skillsList}`;
       return await callGeminiJson<SkillGapResult>(prompt);
     }
@@ -644,10 +429,7 @@ export class GeminiProvider {
     try {
       return await generateCoverLetterFn({ data: { resumeText, jobDescription, ...opts } });
     } catch (err) {
-      console.warn(
-        "Server function generateCoverLetterFn failed, using direct client fallback:",
-        err,
-      );
+      console.warn("Server function generateCoverLetterFn failed, retrying directly:", err);
       const prompt = buildCoverLetterPrompt(
         resumeText,
         jobDescription,
@@ -664,7 +446,7 @@ export class GeminiProvider {
     try {
       return await predictSalaryFn({ data: { resumeText, targetRole } });
     } catch (err) {
-      console.warn("Server function predictSalaryFn failed, using direct client fallback:", err);
+      console.warn("Server function predictSalaryFn failed, retrying directly:", err);
       const prompt = `Predict the market salary for this candidate targeting ${targetRole}. Return ONLY valid JSON matching: { estimatedSalary: string, confidence: "High"|"Medium"|"Low", factors: string[] }\n\nResume:\n${resumeText}`;
       return await callGeminiJson<SalaryPredictionResult>(prompt);
     }
@@ -678,10 +460,7 @@ export class GeminiProvider {
     try {
       return await compareCandidatesFn({ data: { candidateA, candidateB, jobDescription } });
     } catch (err) {
-      console.warn(
-        "Server function compareCandidatesFn failed, using direct client fallback:",
-        err,
-      );
+      console.warn("Server function compareCandidatesFn failed, retrying directly:", err);
       const prompt = `Compare these two candidates${jobDescription ? ` for this job:\n${jobDescription}` : ""}. Return ONLY valid JSON matching: { winner: string, reasoning: string, comparison: [{ category: string, candidateA: string, candidateB: string }] }\n\nCandidate A (Name: ${candidateA?.candidateName}):\n${JSON.stringify(candidateA)}\n\nCandidate B (Name: ${candidateB?.candidateName}):\n${JSON.stringify(candidateB)}`;
       return await callGeminiJson<CandidateComparisonResult>(prompt);
     }
@@ -691,11 +470,11 @@ export class GeminiProvider {
     try {
       return await assistFn({ data: { prompt } });
     } catch (err) {
-      console.warn("Server function assistFn failed, using direct client fallback:", err);
+      console.warn("Server function assistFn failed, retrying directly:", err);
       const res = await callGeminiJson<{ response: string }>(
         `${prompt}\n\nReturn ONLY a JSON object with this exact schema: { "response": "your detailed text response here" }`,
       );
-      return res.response || "AI assistance response";
+      return res.response;
     }
   }
 
@@ -708,7 +487,7 @@ export class GeminiProvider {
     try {
       return await aiHelperFn({ data: { type, context, role, count } });
     } catch (err) {
-      console.warn("Server function aiHelperFn failed, using direct client fallback:", err);
+      console.warn("Server function aiHelperFn failed, retrying directly:", err);
       let prompt = "";
       const cnt = count || 3;
       if (type === "summary") {
@@ -733,7 +512,7 @@ export class GeminiProvider {
       if (!res.data || Object.keys(res.data).length === 0) return null;
       return res;
     } catch (err) {
-      console.warn("Server function cleanupImportFn failed, using direct client fallback:", err);
+      console.warn("Server function cleanupImportFn failed, retrying directly:", err);
       const res = await callGeminiJson<ImportCleanupResult>(buildImportCleanupPrompt(resumeJson));
       if (!res.data || Object.keys(res.data).length === 0) return null;
       return res;

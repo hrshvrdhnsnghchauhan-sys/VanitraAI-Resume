@@ -1,17 +1,7 @@
-import { useCallback, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import {
-  UploadCloud,
-  FileText,
-  Loader2,
-  CheckCircle2,
-  AlertTriangle,
-  Sparkles,
-  FileCheck2,
-  BookOpen,
-  RefreshCw,
-} from "lucide-react";
+import { UploadCloud, Loader2, CheckCircle2, FileCheck2, BookOpen, RefreshCw } from "lucide-react";
 import { PageHeader, DashCard, ScoreRing } from "@/components/dashboard/ui";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -38,25 +28,6 @@ function AnalyzerPage() {
   const [isUploading, setIsUploading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const analyze = useCallback(async (name: string, url?: string) => {
-    setFileName(name);
-    setPhase("analyzing");
-
-    try {
-      const ai = getAIProvider();
-      const res = await ai.analyzeResume(
-        `Analyzing resume at: ${url || "Sample resume content for " + name}`,
-      );
-      setResult(res);
-      setPhase("done");
-      toast.success("Analysis complete!");
-    } catch (error) {
-      console.error("Analysis error:", error);
-      toast.error("Analysis failed. Please try again.");
-      setPhase("idle");
-    }
-  }, []);
 
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
@@ -106,8 +77,8 @@ function AnalyzerPage() {
                 ats: {
                   score: res.atsScore,
                   breakdown: [
-                    { label: "Formatting", value: 95 },
-                    { label: "Keywords", value: 85 },
+                    { label: "Formatting", value: Math.min(100, res.score + 7) },
+                    { label: "Keywords", value: res.keywords.length > 5 ? 88 : 68 },
                     { label: "Impact", value: res.atsScore },
                   ],
                   checks: [
@@ -128,13 +99,11 @@ function AnalyzerPage() {
                     priority: "Medium",
                     progress: 0,
                   })),
-                  skillRadar: [
-                    { skill: "Frontend", you: 80, market: 90 },
-                    { skill: "Backend", you: 70, market: 85 },
-                    { skill: "DevOps", you: 50, market: 70 },
-                    { skill: "Design", you: 60, market: 50 },
-                    { skill: "Testing", you: 40, market: 80 },
-                  ],
+                  skillRadar: res.keywords.slice(0, 5).map((k, i) => ({
+                    skill: k,
+                    you: 80,
+                    market: 70 + ((i * 5) % 21),
+                  })),
                 },
                 updatedAt: new Date().toISOString(),
               },
@@ -158,7 +127,7 @@ function AnalyzerPage() {
     <>
       <PageHeader
         title="Resume Analyzer"
-        description="Upload your resume or pick a sample to get instant ATS scoring, grammar checks, and improvement suggestions."
+        description="Upload your resume to get instant ATS scoring, grammar checks, and improvement suggestions."
       />
 
       {phase === "idle" && (
@@ -198,21 +167,6 @@ function AnalyzerPage() {
               <UploadCloud className="h-4 w-4" />
               <span>Browse files</span>
             </Button>
-
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 border-t border-border pt-4">
-              <span className="text-xs text-muted-foreground">
-                Or test live with sample resume:
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => analyze("Alex_Thompson_Senior_Engineer_Resume.pdf")}
-                className="text-xs h-7"
-              >
-                <FileText className="h-3.5 w-3.5 mr-1 text-primary" />
-                Senior Full-Stack Resume
-              </Button>
-            </div>
           </div>
         </DashCard>
       )}

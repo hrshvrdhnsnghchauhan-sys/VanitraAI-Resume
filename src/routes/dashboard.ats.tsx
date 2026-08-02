@@ -6,20 +6,10 @@ import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/services/firebase";
-import { getAIProvider } from "@/ai/core";
 
 export const Route = createFileRoute("/dashboard/ats")({
   component: AtsPage,
 });
-
-const defaultChecks = [
-  { label: "Single-column, ATS-safe layout", status: "pass" },
-  { label: "Standard section headings", status: "pass" },
-  { label: "No images or tables blocking parsing", status: "pass" },
-  { label: "Contains relevant job keywords", status: "warn" },
-  { label: "Consistent date formatting", status: "pass" },
-  { label: "No headers/footers with contact info", status: "fail" },
-];
 
 const icon = {
   pass: <CheckCircle2 className="h-5 w-5 text-success" />,
@@ -32,7 +22,7 @@ function AtsPage() {
   const [loading, setLoading] = useState(true);
   const [atsScore, setAtsScore] = useState(0);
   const [scoreBreakdown, setScoreBreakdown] = useState<{ label: string; value: number }[]>([]);
-  const [checks, setChecks] = useState<{ label: string; status: string }[]>(defaultChecks);
+  const [checks, setChecks] = useState<{ label: string; status: string }[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,37 +34,24 @@ function AtsPage() {
 
           if (analysisSnap.exists() && analysisSnap.data().ats) {
             const data = analysisSnap.data().ats;
-            setAtsScore(data.score || 88);
-            setScoreBreakdown(
-              data.breakdown || [
-                { label: "Formatting", value: 95 },
-                { label: "Keywords", value: 85 },
-                { label: "Impact", value: 90 },
-              ],
-            );
-            setChecks(data.checks || defaultChecks);
+            // Show ONLY real stored analysis values — never fabricated fallbacks.
+            setAtsScore(data.score || 0);
+            setScoreBreakdown(data.breakdown || []);
+            setChecks(data.checks || []);
             setLoading(false);
             return;
           }
         }
 
-        // Fallback for live demo or when ATS data is not in Firestore yet
-        setAtsScore(88);
-        setScoreBreakdown([
-          { label: "Formatting", value: 95 },
-          { label: "Keywords", value: 85 },
-          { label: "Impact", value: 90 },
-        ]);
-        setChecks(defaultChecks);
+        // No analysis stored yet — show a real empty state (no fabricated score).
+        setAtsScore(0);
+        setScoreBreakdown([]);
+        setChecks([]);
       } catch (err) {
         console.error("Error fetching ATS score:", err);
-        setAtsScore(88);
-        setScoreBreakdown([
-          { label: "Formatting", value: 95 },
-          { label: "Keywords", value: 85 },
-          { label: "Impact", value: 90 },
-        ]);
-        setChecks(defaultChecks);
+        setAtsScore(0);
+        setScoreBreakdown([]);
+        setChecks([]);
       } finally {
         setLoading(false);
       }

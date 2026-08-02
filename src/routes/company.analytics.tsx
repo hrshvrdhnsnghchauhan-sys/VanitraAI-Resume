@@ -63,6 +63,8 @@ function AnalyticsPage() {
         let totalAts = 0;
         let totalMatch = 0;
         let offers = 0;
+        let hired = 0;
+        let totalHireDays = 0;
         const skillCounts: Record<string, number> = {};
         const sourceCounts: Record<string, number> = {};
 
@@ -70,6 +72,16 @@ function AnalyticsPage() {
           totalAts += app.ats || 0;
           totalMatch += app.jobMatch || 0;
           if (app.status === "Offer") offers++;
+          if (app.status === "Accepted") {
+            hired++;
+            // Real time-to-hire: days between application creation and the hire
+            // action (hiredAt) — computed from actual Firestore timestamps.
+            const created = app.createdAt?.toDate ? app.createdAt.toDate() : null;
+            const hiredAt = app.hiredAt?.toDate ? app.hiredAt.toDate() : null;
+            if (created && hiredAt && hiredAt.getTime() > created.getTime()) {
+              totalHireDays += Math.round((hiredAt.getTime() - created.getTime()) / 86_400_000);
+            }
+          }
 
           // Aggregate Skills
           const skillsList = app.skills || app.resumeData?.skills || [];
@@ -83,12 +95,12 @@ function AnalyticsPage() {
           sourceCounts[src] = (sourceCounts[src] || 0) + 1;
         });
 
-        // Compute Averages
+        // Compute Averages — all from real applicant data.
         setMetrics({
           avgAts: Math.round(totalAts / apps.length),
           avgMatch: Math.round(totalMatch / apps.length),
           offerRate: Math.round((offers / apps.length) * 100),
-          timeToHire: offers > 0 ? "14d" : "N/A", // Placeholder for actual time delta
+          timeToHire: hired > 0 ? `${Math.round(totalHireDays / hired)}d` : "N/A",
         });
 
         // Compute Top Skills

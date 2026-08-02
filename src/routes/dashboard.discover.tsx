@@ -480,12 +480,6 @@ function DiscoverPage() {
                       </div>
                       <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <Building className="h-3.5 w-3.5" /> {job.company}
-                        <span className="text-muted-foreground/60">·</span>
-                        {job.source === "demo" ? (
-                          <span className="text-muted-foreground/60">Demo listing</span>
-                        ) : (
-                          <span>On platform</span>
-                        )}
                       </p>
                     </div>
                   </div>
@@ -581,9 +575,7 @@ function DiscoverPage() {
                   </span>
                 </DialogTitle>
                 <DialogDescription>
-                  Posted {relativeTime(activeJob.postedAt)} ·{" "}
-                  {activeJob.source === "demo" && "Demo listing · "}
-                  {activeJob.location}
+                  Posted {relativeTime(activeJob.postedAt)} · {activeJob.location}
                 </DialogDescription>
               </DialogHeader>
 

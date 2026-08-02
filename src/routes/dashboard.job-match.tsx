@@ -73,24 +73,11 @@ function JobMatchPage() {
             <FileText className="h-10 w-10 text-muted-foreground" />
             <h3 className="mt-4 font-semibold text-lg">No Resume Found</h3>
             <p className="mt-1 mb-6 text-sm text-muted-foreground">
-              You need to build your resume before matching it with jobs, or load a sample resume to
-              test live.
+              You need to build your resume before matching it with jobs.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Button asChild>
                 <Link to="/dashboard/builder">Build Resume</Link>
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setResumeText(`Senior Full Stack Engineer Resume
-Skills: React, TypeScript, Node.js, GraphQL, AWS, Docker, CI/CD, Next.js, Tailwind CSS, PostgreSQL, System Architecture
-Summary: Results-driven Senior Full Stack Engineer with 5+ years of experience architecting high-performance cloud applications and scaling microservices for 100,000+ users.
-Experience: Led frontend and backend architecture, boosting performance by 40% and cutting latency. Spearheaded cloud migrations on AWS and containerized core applications using Docker and Kubernetes.`);
-                  toast.success("Loaded sample Full-Stack Resume for testing!");
-                }}
-              >
-                Use Sample Resume
               </Button>
             </div>
           </div>
@@ -98,29 +85,10 @@ Experience: Led frontend and backend architecture, boosting performance by 40% a
       ) : (
         <>
           <DashCard title="Job Description">
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-muted-foreground">
                 Paste target job description below:
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-primary"
-                onClick={() => {
-                  setJd(`We are seeking a Senior Full Stack Engineer to lead our core product team.
-Responsibilities:
-- Architect and develop scalable web applications using React, TypeScript, Node.js, and Next.js.
-- Design resilient cloud infrastructure on AWS using Docker and Kubernetes.
-- Collaborate with product and engineering teams to optimize system latency and UX.
-Requirements:
-- 4+ years of full-stack engineering experience with modern JavaScript/TypeScript.
-- Experience with AWS, Docker, and CI/CD pipelines.
-- Familiarity with agile workflows and mentoring junior engineers.`);
-                  toast.success("Loaded sample Job Description!");
-                }}
-              >
-                + Load Sample Job Description
-              </Button>
             </div>
             <Textarea
               value={jd}

@@ -319,23 +319,6 @@ function BillingPage() {
           return;
         }
 
-        if (res.isDemo) {
-          // Demo mode — no Stripe keys configured. Simulate activation.
-          await writeSubscriptionRecords(
-            plan.id,
-            interval,
-            "stripe",
-            `pay_demo_${Date.now()}`,
-            `sub_demo_${Date.now()}`,
-            "active",
-            amount,
-            trialDays,
-          );
-          toast.success(`Demo Mode: Upgraded to ${plan.name} Plan successfully!`);
-          setIsProcessing(false);
-          return;
-        }
-
         // Hosted Checkout redirect — Stripe handles cards/UPI/wallets.
         if (res.checkoutUrl) {
           window.location.href = res.checkoutUrl;
@@ -357,22 +340,6 @@ function BillingPage() {
 
       if (!subResponse.success) {
         toast.error(subResponse.error || "Failed to create subscription.");
-        setIsProcessing(false);
-        return;
-      }
-
-      if (subResponse.isDemo) {
-        await writeSubscriptionRecords(
-          plan.id,
-          interval,
-          "razorpay",
-          `pay_demo_${Date.now()}`,
-          `sub_demo_${Date.now()}`,
-          "active",
-          amount,
-          trialDays,
-        );
-        toast.success(`Demo Mode: Upgraded to ${plan.name} Plan successfully!`);
         setIsProcessing(false);
         return;
       }

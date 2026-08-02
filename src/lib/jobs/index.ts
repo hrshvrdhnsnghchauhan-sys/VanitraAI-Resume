@@ -1,15 +1,14 @@
 import { collection, getDocs, query, limit } from "firebase/firestore";
 import { db } from "@/services/firebase";
-import { DEMO_JOBS } from "./demo";
 import type { Job, JobSource } from "./types";
 
 export * from "./types";
-export { DEMO_JOBS } from "./demo";
 
 /**
  * Firestore source: jobs posted by companies on the platform.
  * Read-only on the client; write access is governed by Firestore rules
- * (companies may only manage their own postings).
+ * (companies may only manage their own postings). This is the ONLY job source
+ * in production — no demo or mock listings are merged in.
  */
 export class FirestoreJobSource implements JobSource {
   id = "firestore";
@@ -25,25 +24,14 @@ export class FirestoreJobSource implements JobSource {
 }
 
 /**
- * Demo source: the in-house fictional dataset, used whenever Firestore has no
- * real listings (fresh project, no company yet posted) so the Discover page is
- * never empty. Replace/extend by adding more providers here.
+ * Registered job providers. To add a licensed provider later (e.g. a paid
+ * job-board API), implement JobSource in types.ts and register it here.
  */
-export class DemoJobSource implements JobSource {
-  id = "demo";
-  name = "Demo listings (development)";
-
-  async fetchJobs(): Promise<Job[]> {
-    return DEMO_JOBS;
-  }
-}
-
-const SOURCES: JobSource[] = [new FirestoreJobSource(), new DemoJobSource()];
+const SOURCES: JobSource[] = [new FirestoreJobSource()];
 
 /**
  * Resolve jobs from every registered source and merge them into a single
- * deduplicated list. Dedup is by (companyId, title) so a company posting the
- * same role as a demo listing is not shown twice.
+ * list, deduplicated by (companyId, title).
  */
 export async function getJobs(): Promise<Job[]> {
   const results = await Promise.all(
@@ -68,11 +56,8 @@ export async function getJobs(): Promise<Job[]> {
     }
   }
 
-  // Real postings first, then demo listings.
-  return merged.sort((a, b) => {
-    const rank = (j: Job) => (j.source === "firestore" ? 0 : 1);
-    return rank(a) - rank(b) || +new Date(b.postedAt) - +new Date(a.postedAt);
-  });
+  // Newest postings first.
+  return merged.sort((a, b) => +new Date(b.postedAt) - +new Date(a.postedAt));
 }
 
 /**

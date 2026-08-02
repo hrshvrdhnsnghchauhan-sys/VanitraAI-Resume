@@ -27,8 +27,7 @@ export const generateInvoicePDF = (details: InvoiceDetails) => {
 
   doc.setFontSize(10);
   doc.setTextColor(100);
-  doc.text("GSTIN: 27AAAAA0000A1Z5 (Placeholder)", 14, 30);
-  doc.text("Email: support@vanitra.ai", 14, 36);
+  doc.text("Email: support@vanitra.ai", 14, 30);
 
   // Invoice Details
   doc.setFontSize(16);

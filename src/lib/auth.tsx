@@ -22,7 +22,7 @@ import {
   User as FirebaseUser,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
-import { auth, db, firebaseConfigured } from "@/services/firebase";
+import { auth, db } from "@/services/firebase";
 import { toast } from "sonner";
 
 export type Role = "candidate" | "company" | "admin";
@@ -288,17 +288,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // Local fallback (fake sessions) is DEV-ONLY. In production builds
-    // (import.meta.env.DEV === false) an unconfigured Firebase must never
-    // fabricate a signed-in user — fail closed instead.
-    if (!auth && import.meta.env.DEV) {
-      const localUser = getLocalUserSession();
-      if (localUser) setUser(localUser);
-      setHydrated(true);
-      setTokenReady(true);
-      setLoading(false);
-      return;
-    }
+    // Firebase auth is required. In production builds (import.meta.env.DEV ===
+    // false) an unconfigured Firebase must never fabricate a signed-in user —
+    // fail closed instead.
     if (!auth) {
       setHydrated(true);
       setTokenReady(false);
@@ -455,20 +447,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setTokenReady(false);
-        // Only restore a cached local session when Firebase is NOT configured
-        // AND we're in a dev build. In production, an unconfigured Firebase
-        // must never fabricate a signed-in session — trust real auth state.
-        if (!firebaseConfigured && import.meta.env.DEV) {
-          const localUser = getLocalUserSession();
-          if (localUser) {
-            setUser(localUser);
-            setTokenReady(true);
-          } else {
-            setUser(null);
-          }
-        } else {
-          setUser(null);
-        }
+        // Trust real auth state only — never fabricate a signed-in session.
+        setUser(null);
       }
       setHydrated(true);
       setLoading(false);
@@ -512,26 +492,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       saveLocalUserSession(appUser);
       return appUser;
     } catch (error: any) {
-      // Dev-only local fallback — NEVER fabricate sessions in production.
-      if (!firebaseConfigured && import.meta.env.DEV) {
-        // Local fallback mode: Firebase env vars missing — keep demo behavior
-        console.warn("Firebase Auth login fallback (Firebase not configured):", error);
-        const localUser = getLocalUserSession(email);
-        if (localUser) {
-          setUser(localUser);
-          saveLocalUserSession(localUser);
-          return localUser;
-        }
-        const demoUser: AppUser = {
-          uid: "local_" + Math.random().toString(36).substring(2, 11),
-          name: email.split("@")[0],
-          email: email,
-          role: "candidate",
-        };
-        setUser(demoUser);
-        saveLocalUserSession(demoUser);
-        return demoUser;
-      }
       // Production mode: never fabricate a session on a real auth error
       throw friendlyAuthError(
         error,
@@ -569,18 +529,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const code = error?.code || "";
         if (code === "auth/email-already-in-use") {
           throw new Error("This email is already registered. Please sign in instead.");
-        }
-        if (!firebaseConfigured && import.meta.env.DEV) {
-          console.warn("Firebase Auth signup fallback (Firebase not configured):", error);
-          const fallbackUser: AppUser = {
-            uid: "local_" + Math.random().toString(36).substring(2, 11),
-            name: name || email.split("@")[0],
-            email: email,
-            role: role || "candidate",
-          };
-          setUser(fallbackUser);
-          saveLocalUserSession(fallbackUser);
-          return fallbackUser;
         }
         throw friendlyAuthError(error, "Failed to create account. Please try again.");
       } finally {
@@ -637,19 +585,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error: any) {
       pendingSignupRoleRef.current = null;
-      // Dev-only local fallback — NEVER fabricate sessions in production.
-      if (!firebaseConfigured && import.meta.env.DEV) {
-        console.warn("Firebase Google login fallback (Firebase not configured):", error);
-        const demoGoogleUser: AppUser = {
-          uid: "local_google_" + Math.random().toString(36).substring(2, 11),
-          name: "Google User",
-          email: "demo.user@gmail.com",
-          role,
-        };
-        setUser(demoGoogleUser);
-        saveLocalUserSession(demoGoogleUser);
-        return demoGoogleUser;
-      }
       throw friendlyAuthError(error, "Failed to sign in with Google. Please try again.");
     } finally {
       explicitAuthInFlightRef.current = false;
