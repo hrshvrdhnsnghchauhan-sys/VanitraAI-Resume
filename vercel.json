@@ -15,6 +15,18 @@
       "handle": "filesystem"
     },
     {
+      "src": "/assets/(.*)",
+      "dest": "/dist/client/assets/$1"
+    },
+    {
+      "src": "/manifest\\.webmanifest",
+      "dest": "/dist/client/manifest.webmanifest"
+    },
+    {
+      "src": "/registerSW\\.js",
+      "dest": "/dist/client/registerSW.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/dist/server/server.js"
     }
