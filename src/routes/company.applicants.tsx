@@ -1,6 +1,23 @@
 import { useMemo, useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowUpDown, Search, Loader2, Sparkles, Scale, Trophy } from "lucide-react";
+import {
+  ArrowUpDown,
+  Search,
+  Loader2,
+  Sparkles,
+  Scale,
+  Trophy,
+  Eye,
+  UserCheck,
+  CalendarClock,
+  FileBadge,
+  CheckCircle2,
+  XCircle,
+  MoreHorizontal,
+  FileText,
+  Mail,
+  Briefcase,
+} from "lucide-react";
 import { PageHeader, DashCard } from "@/components/dashboard/ui";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,12 +43,29 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
 import { cn, recColor } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  doc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "@/services/firebase";
 import { getAIProvider, type CandidateComparisonResult } from "@/ai/core";
 import { toast } from "sonner";
@@ -41,6 +75,18 @@ export const Route = createFileRoute("/company/applicants")({
 });
 
 type SortKey = "overall" | "ats" | "resume" | "jobMatch";
+
+const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
+  Interview: "default",
+  Assessment: "default",
+  "HR Round": "default",
+  Offer: "default",
+  Accepted: "default",
+  Applied: "secondary",
+  Screening: "secondary",
+  Rejected: "destructive",
+  Withdrawn: "destructive",
+};
 
 function ApplicantsPage() {
   const { user } = useAuth();
@@ -55,6 +101,13 @@ function ApplicantsPage() {
   const [comparing, setComparing] = useState(false);
   const [comparisonData, setComparisonData] = useState<CandidateComparisonResult | null>(null);
   const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+
+  // Profile viewer + status action dialog
+  const [profile, setProfile] = useState<any | null>(null);
+  const [actionCandidate, setActionCandidate] = useState<any | null>(null);
+  const [nextStatus, setNextStatus] = useState("Screening");
+  const [interviewDate, setInterviewDate] = useState("");
+  const [interviewNotes, setInterviewNotes] = useState("");
 
   useEffect(() => {
     if (!user?.uid || !db) return;
@@ -111,6 +164,46 @@ function ApplicantsPage() {
     } finally {
       setComparing(false);
     }
+  };
+
+  const setStatus = async (candidate: any, status: string, extra: Record<string, any> = {}) => {
+    if (!db || !candidate?.id) return;
+    try {
+      await updateDoc(doc(db, "applications", candidate.id), {
+        status,
+        updatedAt: serverTimestamp(),
+        ...extra,
+      });
+      setCandidates((prev) =>
+        prev.map((c) => (c.id === candidate.id ? { ...c, status, ...extra } : c)),
+      );
+      toast.success(`Marked as ${status}`);
+      setActionCandidate(null);
+      setProfile((p: any) => (p && p.id === candidate.id ? { ...p, status, ...extra } : p));
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update status");
+    }
+  };
+
+  const openInterviewDialog = (candidate: any) => {
+    setActionCandidate(candidate);
+    setNextStatus("Interview");
+    setInterviewDate("");
+    setInterviewNotes("");
+  };
+
+  const scheduleInterview = () => {
+    if (!actionCandidate) return;
+    if (!interviewDate) {
+      toast.error("Pick an interview date");
+      return;
+    }
+    setStatus(actionCandidate, "Interview", {
+      interviewDate,
+      interviewNotes: interviewNotes.trim(),
+      interviewScheduledAt: serverTimestamp(),
+    });
   };
 
   return (
@@ -174,28 +267,29 @@ function ApplicantsPage() {
                 </TableHead>
                 <TableHead>Candidate</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>ATS</TableHead>
                 <TableHead>Resume</TableHead>
                 <TableHead>Job Match</TableHead>
-                <TableHead>Skill</TableHead>
                 <TableHead className="min-w-32">
                   <span className="inline-flex items-center gap-1">
                     Overall <ArrowUpDown className="h-3 w-3" />
                   </span>
                 </TableHead>
                 <TableHead>Recommendation</TableHead>
+                <TableHead className="w-[90px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center p-8">
+                  <TableCell colSpan={10} className="text-center p-8">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center p-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center p-8 text-muted-foreground">
                     No applicants found.
                   </TableCell>
                 </TableRow>
@@ -219,11 +313,24 @@ function ApplicantsPage() {
                         <span className="font-medium">{c.candidateName || "Candidate"}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{c.jobTitle || "Any Role"}</TableCell>
+                    <TableCell>{c.jobTitle || c.role || "Any Role"}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusVariant[c.status] || "secondary"}>
+                        {c.status || "Applied"}
+                      </Badge>
+                      {c.interviewDate && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {new Date(c.interviewDate).toLocaleDateString()}{" "}
+                          {new Date(c.interviewDate).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>{c.ats || 0}</TableCell>
                     <TableCell>{c.resume || 0}</TableCell>
                     <TableCell>{c.jobMatch || 0}%</TableCell>
-                    <TableCell>{c.skill || 0}%</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Progress value={c.overall || 0} className="w-16" />
@@ -236,6 +343,48 @@ function ApplicantsPage() {
                       >
                         {c.rec || "Average Match"}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuItem onClick={() => setProfile(c)}>
+                            <Eye className="h-4 w-4 mr-2" /> View Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setStatus(c, "Screening")}>
+                            <UserCheck className="h-4 w-4 mr-2" /> Shortlist / Screening
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openInterviewDialog(c)}>
+                            <CalendarClock className="h-4 w-4 mr-2" /> Schedule Interview
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setStatus(c, "Assessment")}>
+                            <FileBadge className="h-4 w-4 mr-2" /> Send Assessment
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setStatus(c, "HR Round")}>
+                            <Briefcase className="h-4 w-4 mr-2" /> HR Round
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setStatus(c, "Offer")}>
+                            <FileText className="h-4 w-4 mr-2" /> Make Offer
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setStatus(c, "Accepted", { hiredAt: serverTimestamp() })}
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-2" /> Hire
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setStatus(c, "Rejected")}
+                          >
+                            <XCircle className="h-4 w-4 mr-2" /> Reject
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
@@ -253,13 +402,12 @@ function ApplicantsPage() {
           },
           { label: "Recommended", count: candidates.filter((c) => c.rec === "Recommended").length },
           {
-            label: "Average Match",
-            count: candidates.filter((c) => (c.rec || "Average Match") === "Average Match").length,
+            label: "In Interview",
+            count: candidates.filter((c) =>
+              ["Interview", "Assessment", "HR Round"].includes(c.status),
+            ).length,
           },
-          {
-            label: "Not Recommended",
-            count: candidates.filter((c) => c.rec === "Not Recommended").length,
-          },
+          { label: "Hired", count: candidates.filter((c) => c.status === "Accepted").length },
         ].map((s) => (
           <DashCard key={s.label} className="text-center">
             <div className={cn("text-3xl font-bold", recColor(s.label))}>{s.count}</div>
@@ -268,6 +416,140 @@ function ApplicantsPage() {
         ))}
       </div>
 
+      {/* Candidate profile / resume viewer */}
+      <Dialog open={!!profile} onOpenChange={(v) => !v && setProfile(null)}>
+        <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+          {profile && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
+                    {profile.candidateName
+                      ?.split(" ")
+                      .map((n: string) => n[0])
+                      .join("") || "?"}
+                  </span>
+                  <span>
+                    <span className="block">{profile.candidateName || "Candidate"}</span>
+                    <span className="block text-sm font-normal text-muted-foreground">
+                      {profile.jobTitle || profile.role || "Applicant"}
+                    </span>
+                  </span>
+                </DialogTitle>
+                <DialogDescription>
+                  {profile.candidateEmail && (
+                    <span className="inline-flex items-center gap-1">
+                      <Mail className="h-3.5 w-3.5" /> {profile.candidateEmail}
+                    </span>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-border p-3 text-center">
+                  <div className="text-xl font-bold text-primary">{profile.overall || 0}%</div>
+                  <div className="text-xs text-muted-foreground">Overall match</div>
+                </div>
+                <div className="rounded-xl border border-border p-3 text-center">
+                  <div className="text-xl font-bold">{profile.ats || 0}</div>
+                  <div className="text-xs text-muted-foreground">ATS score</div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  { label: "Resume score", value: profile.resume || 0 },
+                  { label: "Job match", value: profile.jobMatch || 0 },
+                  { label: "Skill match", value: profile.skill || 0 },
+                  { label: "Experience match", value: profile.exp || 0 },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-muted-foreground">{row.label}</span>
+                    <div className="flex items-center gap-2">
+                      <Progress value={row.value} className="w-28" />
+                      <span className="w-8 text-right text-sm font-semibold">{row.value}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {profile.resumeSummary && (
+                <div>
+                  <h4 className="mb-1 text-sm font-semibold">Summary</h4>
+                  <p className="text-sm text-muted-foreground">{profile.resumeSummary}</p>
+                </div>
+              )}
+
+              {profile.resumeUrl && (
+                <Button variant="outline" asChild className="w-full">
+                  <a href={profile.resumeUrl} target="_blank" rel="noreferrer">
+                    <FileText className="mr-2 h-4 w-4" /> Open Resume
+                  </a>
+                </Button>
+              )}
+
+              <DialogFooter className="sm:justify-between">
+                <Button
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setStatus(profile, "Rejected")}
+                >
+                  <XCircle className="mr-2 h-4 w-4" /> Reject
+                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => openInterviewDialog(profile)}>
+                    <CalendarClock className="mr-2 h-4 w-4" /> Interview
+                  </Button>
+                  <Button variant="hero" onClick={() => setStatus(profile, "Offer")}>
+                    <FileText className="mr-2 h-4 w-4" /> Offer
+                  </Button>
+                </div>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Interview scheduling */}
+      <Dialog open={!!actionCandidate} onOpenChange={(v) => !v && setActionCandidate(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Schedule Interview</DialogTitle>
+            <DialogDescription>
+              {actionCandidate?.candidateName} ·{" "}
+              {actionCandidate?.jobTitle || actionCandidate?.role}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Date & time</Label>
+              <Input
+                type="datetime-local"
+                value={interviewDate}
+                onChange={(e) => setInterviewDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notes for the candidate</Label>
+              <Input
+                placeholder="e.g. Video call · 45 min · panel interview"
+                value={interviewNotes}
+                onChange={(e) => setInterviewNotes(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActionCandidate(null)}>
+              Cancel
+            </Button>
+            <Button variant="hero" onClick={scheduleInterview}>
+              <CalendarClock className="mr-2 h-4 w-4" /> Confirm Interview
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI comparison dialog (existing) */}
       <Dialog
         open={compareDialogOpen}
         onOpenChange={(v) => {
