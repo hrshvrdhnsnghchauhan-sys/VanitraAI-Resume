@@ -13,15 +13,30 @@ const getEnv = (key: string) => {
 };
 
 const firebaseConfig = {
-  apiKey: getEnv("VITE_FIREBASE_API_KEY") || getEnv("NEXT_PUBLIC_FIREBASE_API_KEY"),
-  authDomain: getEnv("VITE_FIREBASE_AUTH_DOMAIN") || getEnv("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
-  projectId: getEnv("VITE_FIREBASE_PROJECT_ID") || getEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
+  apiKey:
+    getEnv("VITE_FIREBASE_API_KEY") ||
+    getEnv("NEXT_PUBLIC_FIREBASE_API_KEY") ||
+    "AIzaSyBQSazA0rrRCvLP1lY-H1Hb4YnicPc-LkQ",
+  authDomain:
+    getEnv("VITE_FIREBASE_AUTH_DOMAIN") ||
+    getEnv("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN") ||
+    "ai-resume-builder-7c733.firebaseapp.com",
+  projectId:
+    getEnv("VITE_FIREBASE_PROJECT_ID") ||
+    getEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID") ||
+    "ai-resume-builder-7c733",
   storageBucket:
-    getEnv("VITE_FIREBASE_STORAGE_BUCKET") || getEnv("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
+    getEnv("VITE_FIREBASE_STORAGE_BUCKET") ||
+    getEnv("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET") ||
+    "ai-resume-builder-7c733.firebasestorage.app",
   messagingSenderId:
     getEnv("VITE_FIREBASE_MESSAGING_SENDER_ID") ||
-    getEnv("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
-  appId: getEnv("VITE_FIREBASE_APP_ID") || getEnv("NEXT_PUBLIC_FIREBASE_APP_ID"),
+    getEnv("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID") ||
+    "754874323231",
+  appId:
+    getEnv("VITE_FIREBASE_APP_ID") ||
+    getEnv("NEXT_PUBLIC_FIREBASE_APP_ID") ||
+    "1:754874323231:web:1499aee904d672f160602a",
   measurementId:
     getEnv("VITE_FIREBASE_MEASUREMENT_ID") || getEnv("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID"),
 };
