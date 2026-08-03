@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { AppLayout, type NavItem } from "@/components/dashboard/app-layout";
 
+// eslint-disable-next-line react-refresh/only-export-components -- nav config array, not a component; intentional layout export
 export const companyNav: NavItem[] = [
   { label: "Dashboard", to: "/company", icon: LayoutDashboard },
   { label: "Jobs", to: "/company/jobs", icon: BriefcaseBusiness },

@@ -30,7 +30,48 @@ import {
 } from "@/components/ui/accordion";
 import heroImg from "@/assets/hero-dashboard.jpg";
 
+const SITE_URL = "https://job-match-masters-main.vercel.app";
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Vanitra AI Resume",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  url: SITE_URL,
+  description:
+    "AI hiring platform for candidates and companies. Build ATS-friendly resumes, analyze scores, match job descriptions, close skill gaps, and screen candidates automatically.",
+  offers: [
+    {
+      "@type": "Offer",
+      name: "Starter",
+      price: "499",
+      priceCurrency: "INR",
+    },
+    {
+      "@type": "Offer",
+      name: "Pro",
+      price: "999",
+      priceCurrency: "INR",
+    },
+    {
+      "@type": "Offer",
+      name: "Company",
+      price: "2499",
+      priceCurrency: "INR",
+    },
+  ],
+};
+
 export const Route = createFileRoute("/")({
+  head: () => ({
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify(structuredData),
+      },
+    ],
+  }),
   component: Landing,
 });
 
@@ -133,6 +174,8 @@ function Landing() {
                 width={1408}
                 height={1008}
                 alt="AI resume analyzer dashboard showing ATS score and analytics"
+                fetchPriority="high"
+                decoding="async"
                 className="rounded-xl"
               />
             </div>

@@ -40,6 +40,7 @@ function AdminSettingsPage() {
       }
     };
     fetchSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time load on mount; fetchSettings reads current user only
   }, []);
 
   const saveSettings = async () => {

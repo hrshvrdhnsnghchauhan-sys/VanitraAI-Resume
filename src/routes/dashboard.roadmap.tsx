@@ -87,6 +87,7 @@ function RoadmapPage() {
       setInitialLoad(false);
       generateRoadmap();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot generation guarded by initialLoad flag
   }, [resumeText, initialLoad]);
 
   return (

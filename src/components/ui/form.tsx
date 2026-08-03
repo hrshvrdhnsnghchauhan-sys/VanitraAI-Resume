@@ -160,6 +160,7 @@ const FormMessage = React.forwardRef<
 FormMessage.displayName = "FormMessage";
 
 export {
+  // eslint-disable-next-line react-refresh/only-export-components -- useFormField is a hook, not a component; shadcn convention
   useFormField,
   Form,
   FormItem,

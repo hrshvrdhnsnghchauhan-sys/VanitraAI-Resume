@@ -186,6 +186,7 @@ function DashboardHome() {
       unsubAnalysis();
       unsubHistory();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resubscribe when auth state changes; snapshot setters are stable
   }, [user?.uid, authLoading, tokenReady]);
 
   return (

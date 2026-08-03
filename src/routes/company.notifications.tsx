@@ -37,6 +37,7 @@ function NotificationsPage() {
 
   useEffect(() => {
     fetchNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when the signed-in user changes
   }, [user]);
 
   const markAsRead = async (id: string) => {

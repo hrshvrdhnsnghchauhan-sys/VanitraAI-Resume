@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /signup
+Allow: /forgot-password
+Disallow: /dashboard
+Disallow: /company
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://job-match-masters-main.vercel.app/sitemap.xml

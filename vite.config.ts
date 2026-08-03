@@ -13,12 +13,16 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
+      includeAssets: ["favicon.svg", "apple-touch-icon.png", "mask-icon.svg", "og-image.jpg"],
       manifest: {
         name: "Vanitra AI Resume",
         short_name: "Vanitra",
         description: "AI hiring platform for candidates and companies.",
-        theme_color: "#ffffff",
+        theme_color: "#4f46e5",
+        background_color: "#ffffff",
+        display: "standalone",
+        start_url: "/",
+        scope: "/",
         icons: [
           {
             src: "pwa-192x192.png",

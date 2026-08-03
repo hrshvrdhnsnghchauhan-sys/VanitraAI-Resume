@@ -107,7 +107,9 @@ function BuilderPage() {
           if (data.summary !== undefined) setSummary(data.summary);
           if (data.skills !== undefined) setSkills(data.skills);
           if (data.experiences !== undefined) setExperiences(data.experiences);
-        } catch (err) {}
+        } catch (err) {
+          /* ignore malformed locally-cached resume data */
+        }
       }
       return;
     }
@@ -140,7 +142,9 @@ function BuilderPage() {
               updatedAt: new Date().toISOString(),
             },
             { merge: true },
-          ).catch(() => {});
+          ).catch(() => {
+            /* ignore: initial seed write is best-effort */
+          });
         }
       },
       (e) => {
@@ -156,7 +160,9 @@ function BuilderPage() {
             if (data.summary !== undefined) setSummary(data.summary);
             if (data.skills !== undefined) setSkills(data.skills);
             if (data.experiences !== undefined) setExperiences(data.experiences);
-          } catch (err) {}
+          } catch (err) {
+            /* ignore malformed locally-cached resume data */
+          }
         }
       },
     );
@@ -165,7 +171,9 @@ function BuilderPage() {
     let localHistory: any[] = [];
     try {
       localHistory = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    } catch (err) {}
+    } catch (err) {
+      /* ignore malformed local history */
+    }
 
     const unsubHistory = onSnapshot(
       query(collection(db, "resumes", user.uid, "history"), orderBy("createdAt", "desc")),
@@ -185,6 +193,7 @@ function BuilderPage() {
       unsubResume();
       unsubHistory();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resubscribe when auth state changes; snapshot setters are stable
   }, [user?.uid, authLoading, tokenReady]);
 
   const fetchHistory = async () => {
@@ -193,7 +202,9 @@ function BuilderPage() {
     let localHistory: any[] = [];
     try {
       localHistory = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    } catch (err) {}
+    } catch (err) {
+      /* ignore malformed local history */
+    }
     setHistory(localHistory);
   };
 
@@ -233,7 +244,9 @@ function BuilderPage() {
           certifications: [],
           languages: [],
         };
-        autosaveVersion(user.uid!, snapshot).catch(() => {});
+        autosaveVersion(user.uid!, snapshot).catch(() => {
+          /* version snapshot is additive; failures fall back to local save */
+        });
       } catch (e: any) {
         // Fallback to local storage
         localStorage.setItem(`resume_${user.uid}`, JSON.stringify(payload));

@@ -156,7 +156,9 @@ function CoverLetterPage() {
     let localList: SavedLetter[] = [];
     try {
       localList = JSON.parse(localStorage.getItem(`cover_letters_${user.uid}`) || "[]");
-    } catch (err) {}
+    } catch (err) {
+      /* ignore malformed local letters */
+    }
     if (!db) {
       setSavedLetters(localList);
       setLoadingSaved(false);
@@ -256,7 +258,9 @@ function CoverLetterPage() {
         if (filtered.length !== existing.length) {
           localStorage.setItem(key, JSON.stringify(filtered));
         }
-      } catch (err) {}
+      } catch (err) {
+        /* ignore: local cleanup is best-effort */
+      }
       setSaved(true);
       toast.success("Cover letter saved");
       loadSavedLetters();

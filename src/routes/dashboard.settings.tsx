@@ -44,6 +44,7 @@ function SettingsPage() {
       }
     };
     fetchSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when the signed-in user changes
   }, [user]);
 
   const saveSettings = async () => {

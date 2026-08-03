@@ -458,6 +458,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (profileUnsub) profileUnsub();
       unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only auth bootstrap; reads refs and module singletons only
   }, []);
 
   const resetPassword = useCallback(async (email: string) => {
@@ -500,6 +501,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       explicitAuthInFlightRef.current = false;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable callback; profile persistence reads refs/module singletons
   }, []);
 
   const signup = useCallback(
@@ -535,6 +537,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         explicitAuthInFlightRef.current = false;
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable callback; profile persistence reads refs/module singletons
     [],
   );
 
@@ -589,6 +592,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       explicitAuthInFlightRef.current = false;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable callback; profile persistence reads refs/module singletons
   }, []);
 
   const logout = useCallback(async () => {
@@ -633,6 +637,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared hook, not a component; intentional provider-module export
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");

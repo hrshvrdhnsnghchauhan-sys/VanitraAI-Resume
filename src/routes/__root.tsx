@@ -78,6 +78,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 const TITLE = "Vanitra AI Resume — Build Smarter. Get Hired Faster.";
 const DESCRIPTION =
   "The AI hiring platform for candidates and companies. Build ATS-friendly resumes, analyze scores, match job descriptions, close skill gaps, and screen candidates automatically.";
+const SITE_URL = "https://job-match-masters-main.vercel.app";
+const SITE_NAME = "Vanitra AI Resume";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -86,20 +88,46 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: TITLE },
       { name: "description", content: DESCRIPTION },
-      { name: "author", content: "Vanitra AI Resume" },
+      { name: "author", content: SITE_NAME },
+      { name: "robots", content: "index, follow, max-image-preview:large" },
       { property: "og:title", content: TITLE },
       { property: "og:description", content: DESCRIPTION },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: `${SITE_URL}/` },
+      { property: "og:site_name", content: SITE_NAME },
+      { property: "og:image", content: `${SITE_URL}/og-image.jpg` },
+      { property: "og:image:width", content: "1408" },
+      { property: "og:image:height", content: "1008" },
+      {
+        property: "og:image:alt",
+        content: "Vanitra AI Resume dashboard with ATS score and analytics",
+      },
+      { property: "og:locale", content: "en_US" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: TITLE },
       { name: "twitter:description", content: DESCRIPTION },
+      { name: "twitter:image", content: `${SITE_URL}/og-image.jpg` },
+      { name: "twitter:site", content: "@vanitra" },
+      {
+        name: "theme-color",
+        content: "#ffffff",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        name: "theme-color",
+        content: "#0b101e",
+        media: "(prefers-color-scheme: dark)",
+      },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "canonical", href: `${SITE_URL}/` },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "mask-icon", href: "/mask-icon.svg", color: "#4f46e5" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -126,6 +154,12 @@ function RootShell({ children }: { children: ReactNode }) {
         />
       </head>
       <body>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground focus:shadow-lg"
+        >
+          Skip to main content
+        </a>
         {children}
         <Scripts />
       </body>
@@ -149,6 +183,8 @@ function RootComponent() {
             exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="flex min-h-screen flex-col"
+            id="main-content"
+            tabIndex={-1}
           >
             <Outlet />
           </motion.div>

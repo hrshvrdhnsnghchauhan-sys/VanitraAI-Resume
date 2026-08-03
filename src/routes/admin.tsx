@@ -16,6 +16,7 @@ import {
 import { AppLayout, type NavItem } from "@/components/dashboard/app-layout";
 import { useAuth } from "@/lib/auth";
 
+// eslint-disable-next-line react-refresh/only-export-components -- nav config array, not a component; intentional layout export
 export const adminNav: NavItem[] = [
   { label: "Overview", to: "/admin", icon: LayoutDashboard },
   { label: "Users", to: "/admin/users", icon: Users },
