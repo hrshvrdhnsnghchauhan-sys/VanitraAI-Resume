@@ -27,7 +27,7 @@
       "dest": "/dist/client/registerSW.js"
     },
     {
-      "src": "/(favicon\\.svg|mask-icon\\.svg|apple-touch-icon\\.png|og-image\\.jpg|pwa-192x192\\.png|pwa-512x512\\.png|robots\\.txt|sitemap\\.xml)",
+      "src": "/(favicon\\.svg|mask-icon\\.svg|apple-touch-icon\\.png|og-image\\.jpg|pwa-192x192\\.png|pwa-512x512\\.png|robots\\.txt|sitemap\\.xml|sw\\.js)",
       "dest": "/dist/client/$1"
     },
     {
