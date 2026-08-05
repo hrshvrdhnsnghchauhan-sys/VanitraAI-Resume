@@ -17,6 +17,7 @@ import { PageHeader, StatCard, DashCard } from "@/components/dashboard/ui";
 import { useAuth } from "@/lib/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/services/firebase";
+import { getCompanyDemoApplicants } from "@/lib/company-demo-data";
 
 export const Route = createFileRoute("/company/analytics")({
   component: AnalyticsPage,
@@ -45,13 +46,23 @@ function AnalyticsPage() {
   const [sources, setSources] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
-    if (!user?.uid || !db) return;
+    if (!user?.uid) return;
 
     const fetchData = async () => {
       try {
-        const appsQuery = query(collection(db, "applications"), where("companyId", "==", user.uid));
-        const appsSnap = await getDocs(appsQuery);
-        const apps = appsSnap.docs.map((d) => d.data());
+        let apps: any[] = [];
+        if (db) {
+          try {
+            const appsQuery = query(collection(db, "applications"), where("companyId", "==", user.uid));
+            const appsSnap = await getDocs(appsQuery);
+            apps = appsSnap.docs.map((d) => d.data());
+          } catch (e) {
+            console.warn("Firestore analytics fetch error:", e);
+          }
+        }
+        if (apps.length === 0) {
+          apps = getCompanyDemoApplicants(user.uid);
+        }
 
         if (apps.length === 0) {
           setTopSkills([{ name: "No Data", value: 1 }]);

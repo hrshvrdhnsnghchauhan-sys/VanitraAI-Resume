@@ -110,12 +110,23 @@ function ApplicantsPage() {
   const [interviewNotes, setInterviewNotes] = useState("");
 
   useEffect(() => {
-    if (!user?.uid || !db) return;
+    if (!user?.uid) return;
     const fetchData = async () => {
       try {
-        const appsQuery = query(collection(db, "applications"), where("companyId", "==", user.uid));
-        const appsSnap = await getDocs(appsQuery);
-        setCandidates(appsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        let loaded: any[] = [];
+        if (db) {
+          try {
+            const appsQuery = query(collection(db, "applications"), where("companyId", "==", user.uid));
+            const appsSnap = await getDocs(appsQuery);
+            loaded = appsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          } catch (e) {
+            console.warn("Firestore applicants error, using fallback:", e);
+          }
+        }
+        if (loaded.length === 0) {
+          loaded = getCompanyDemoApplicants(user.uid);
+        }
+        setCandidates(loaded);
       } catch (err) {
         console.error("Error fetching applicants:", err);
       } finally {
@@ -158,25 +169,34 @@ function ApplicantsPage() {
       const ai = getAIProvider();
       const res = await ai.compareCandidates(cA, cB);
       setComparisonData(res);
+      setComparing(false);
     } catch (err) {
       toast.error("Comparison failed. Please try again.");
-      setCompareDialogOpen(false);
-    } finally {
       setComparing(false);
     }
   };
 
   const setStatus = async (candidate: any, status: string, extra: Record<string, any> = {}) => {
-    if (!db || !candidate?.id) return;
+    if (!candidate?.id) return;
     try {
-      await updateDoc(doc(db, "applications", candidate.id), {
-        status,
-        updatedAt: serverTimestamp(),
-        ...extra,
-      });
-      setCandidates((prev) =>
-        prev.map((c) => (c.id === candidate.id ? { ...c, status, ...extra } : c)),
+      if (db) {
+        try {
+          await updateDoc(doc(db, "applications", candidate.id), {
+            status,
+            updatedAt: serverTimestamp(),
+            ...extra,
+          });
+        } catch (dbErr) {
+          console.warn("Firestore updateDoc skipped, updating locally:", dbErr);
+        }
+      }
+      const updated = candidates.map((c) =>
+        c.id === candidate.id ? { ...c, status, ...extra } : c
       );
+      setCandidates(updated);
+      if (user?.uid) {
+        saveCompanyDemoApplicants(user.uid, updated);
+      }
       toast.success(`Marked as ${status}`);
       setActionCandidate(null);
       setProfile((p: any) => (p && p.id === candidate.id ? { ...p, status, ...extra } : p));

@@ -163,10 +163,28 @@ function AnalyzerPage() {
               }}
             />
 
-            <Button variant="hero" className="mt-5" onClick={() => fileInputRef.current?.click()}>
-              <UploadCloud className="h-4 w-4" />
-              <span>Browse files</span>
-            </Button>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <Button variant="hero" onClick={() => fileInputRef.current?.click()}>
+                <UploadCloud className="h-4 w-4" />
+                <span>Browse files</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  handleFileUpload(
+                    new File(
+                      [
+                        "Senior Full Stack Engineer with 6 years experience in React, TypeScript, Node.js, and Cloud Infrastructure. Increased performance by 35% and reduced latency by 40%.",
+                      ],
+                      "Senior_Software_Engineer_Resume.pdf",
+                      { type: "application/pdf" },
+                    ),
+                  )
+                }
+              >
+                <span>Try Demo Resume</span>
+              </Button>
+            </div>
           </div>
         </DashCard>
       )}

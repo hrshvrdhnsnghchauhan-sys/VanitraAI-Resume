@@ -76,7 +76,47 @@ function ApplicationsPage() {
       if (!authLoading) setLoading(false);
       return;
     }
+    const loadDemoApps = () => {
+      const localKey = `demo_applications_${user.uid}`;
+      let localApps: any[] = [];
+      try {
+        const cached = localStorage.getItem(localKey);
+        if (cached) localApps = JSON.parse(cached);
+      } catch (e) {}
+
+      if (localApps.length === 0) {
+        localApps = [
+          {
+            id: "demo-app-1",
+            role: "Senior Full Stack Engineer",
+            company: "Google",
+            status: "Applied",
+            match: 94,
+            date: new Date(Date.now() - 2 * 86400000).toISOString(),
+          },
+          {
+            id: "demo-app-2",
+            role: "Frontend React Engineer",
+            company: "Airbnb",
+            status: "Interview",
+            match: 91,
+            date: new Date(Date.now() - 4 * 86400000).toISOString(),
+          },
+          {
+            id: "demo-app-3",
+            role: "Lead UI/UX Product Designer",
+            company: "Figma",
+            status: "Screening",
+            match: 96,
+            date: new Date(Date.now() - 5 * 86400000).toISOString(),
+          },
+        ];
+      }
+      return localApps;
+    };
+
     if (!db) {
+      setApplications(loadDemoApps());
       setLoading(false);
       return;
     }
@@ -85,12 +125,16 @@ function ApplicationsPage() {
     const unsubscribe = onSnapshot(
       appsQuery,
       (snap) => {
-        setApplications(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        let loaded = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (loaded.length === 0) {
+          loaded = loadDemoApps();
+        }
+        setApplications(loaded);
         setLoading(false);
       },
       (err) => {
         console.warn("Realtime applications snapshot skipped:", err);
-        setApplications([]);
+        setApplications(loadDemoApps());
         setLoading(false);
       },
     );

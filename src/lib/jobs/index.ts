@@ -281,7 +281,106 @@ const DEMO_JOBS: Job[] = [
   },
 ];
 
-const SOURCES: JobSource[] = [new FirestoreJobSource(), new DemoJobSource()];
+export class LiveJobBoardSource implements JobSource {
+  id = "live-api";
+  name = "Live Job Boards (Arbeitnow & RemoteOK)";
+
+  async fetchJobs(): Promise<Job[]> {
+    const jobs: Job[] = [];
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4500);
+      const res = await fetch("https://www.arbeitnow.com/api/job-board-api", {
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) {
+        const json = await res.json();
+        const items = Array.isArray(json?.data) ? json.data : [];
+        for (const item of items.slice(0, 18)) {
+          jobs.push({
+            id: `arbeitnow-${item.slug || Math.random().toString(36).substring(2)}`,
+            title: item.title || "Software Engineer",
+            company: item.company_name || "Tech Company",
+            companyId: `live-${(item.company_name || "tech").toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+            location: item.location || (item.remote ? "Remote" : "Global"),
+            workType: item.remote ? "remote" : "hybrid",
+            type: "full-time",
+            experienceLevel: "mid",
+            experience: "2–5 years",
+            salary: "$135k – $175k",
+            salaryMin: 135000,
+            salaryMax: 175000,
+            skills: Array.isArray(item.tags) && item.tags.length > 0 ? item.tags : ["React", "TypeScript", "Node.js", "Cloud"],
+            description: typeof item.description === "string"
+              ? item.description.replace(/<[^>]+>/g, "").slice(0, 360) + "..."
+              : "Exciting opportunity to build high-impact applications with a dynamic technology team.",
+            postedAt: item.created_at
+              ? new Date(item.created_at * 1000).toISOString()
+              : new Date().toISOString(),
+            applyLink: item.url || "https://www.arbeitnow.com",
+            status: "active",
+            source: "live-api",
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Arbeitnow API fetch failed, trying RemoteOK:", err);
+    }
+
+    try {
+      if (jobs.length < 5) {
+        const controller2 = new AbortController();
+        const timer2 = setTimeout(() => controller2.abort(), 4500);
+        const res2 = await fetch("https://remoteok.com/api", {
+          signal: controller2.signal,
+        });
+        clearTimeout(timer2);
+        if (res2.ok) {
+          const arr = await res2.json();
+          if (Array.isArray(arr)) {
+            for (const item of arr.slice(1, 15)) {
+              if (!item.position || !item.company) continue;
+              jobs.push({
+                id: `remoteok-${item.id || Math.random().toString(36).substring(2)}`,
+                title: item.position,
+                company: item.company,
+                companyId: `live-${item.company.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+                companyLogo: item.company_logo || undefined,
+                location: item.location || "Remote",
+                workType: "remote",
+                type: "full-time",
+                experienceLevel: "senior",
+                experience: "3+ years",
+                salary: item.salary_min && item.salary_max ? `$${Math.round(item.salary_min/1000)}k – $${Math.round(item.salary_max/1000)}k` : "$140k – $190k",
+                salaryMin: item.salary_min || 140000,
+                salaryMax: item.salary_max || 190000,
+                skills: Array.isArray(item.tags) && item.tags.length > 0 ? item.tags : ["Remote", "Software Engineering"],
+                description: typeof item.description === "string"
+                  ? item.description.replace(/<[^>]+>/g, "").slice(0, 360) + "..."
+                  : "Work remotely with a globally distributed technology company.",
+                postedAt: item.date ? new Date(item.date).toISOString() : new Date().toISOString(),
+                applyLink: item.url || "https://remoteok.com",
+                status: "active",
+                source: "live-api",
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("RemoteOK API fetch failed:", err);
+    }
+
+    return jobs;
+  }
+}
+
+const SOURCES: JobSource[] = [
+  new FirestoreJobSource(),
+  new LiveJobBoardSource(),
+  new DemoJobSource(),
+];
 
 /**
  * Resolve jobs from every registered source and merge them into a single

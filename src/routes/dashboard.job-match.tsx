@@ -10,6 +10,7 @@ import { getAIProvider, type JobMatchResult } from "@/ai/core";
 import { useAuth } from "@/lib/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/services/firebase";
+import { getDemoResumeText } from "@/lib/demo-resume";
 
 export const Route = createFileRoute("/dashboard/job-match")({
   component: JobMatchPage,
@@ -23,19 +24,24 @@ function JobMatchPage() {
   const [result, setResult] = useState<JobMatchResult | null>(null);
 
   useEffect(() => {
-    if (!user?.uid || !db) return;
+    if (!user?.uid) return;
     const fetchResume = async () => {
       try {
-        const resumeRef = doc(db, "resumes", user.uid);
-        const snap = await getDoc(resumeRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          setResumeText(
-            `Skills: ${data.skills}\nSummary: ${data.summary}\nExperience: ${JSON.stringify(data.experiences || data.experience || [])}\nEducation: ${JSON.stringify(data.education || [])}`,
-          );
+        if (db) {
+          const resumeRef = doc(db, "resumes", user.uid);
+          const snap = await getDoc(resumeRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            setResumeText(
+              `Skills: ${data.skills}\nSummary: ${data.summary}\nExperience: ${JSON.stringify(data.experiences || data.experience || [])}\nEducation: ${JSON.stringify(data.education || [])}`,
+            );
+            return;
+          }
         }
+        setResumeText(getDemoResumeText());
       } catch (err) {
-        console.error("Failed to load resume", err);
+        console.warn("Failed to load resume, using demo fallback", err);
+        setResumeText(getDemoResumeText());
       }
     };
     fetchResume();
@@ -96,14 +102,27 @@ function JobMatchPage() {
               placeholder="Paste the full job description here…"
               className="min-h-40"
             />
-            <Button variant="hero" className="mt-4" onClick={run} disabled={loading}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Target className="h-4 w-4" />
-              )}
-              Analyze match
-            </Button>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button variant="hero" onClick={run} disabled={loading}>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Target className="h-4 w-4" />
+                )}
+                Analyze match
+              </Button>
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() =>
+                  setJd(
+                    "We are seeking a Senior Full Stack Software Engineer to build scalable web applications using React, TypeScript, Node.js, Next.js, and GraphQL. You will architect distributed cloud systems on AWS, optimize database latency, and collaborate with product teams in an Agile environment.",
+                  )
+                }
+              >
+                Paste Sample JD
+              </Button>
+            </div>
           </DashCard>
 
           {result && (

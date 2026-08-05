@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/services/firebase";
 import { recColor } from "@/lib/utils";
+import { getCompanyDemoJobs, getCompanyDemoApplicants } from "@/lib/company-demo-data";
 
 export const Route = createFileRoute("/company/")({
   component: CompanyHome,
@@ -32,14 +33,31 @@ function CompanyHome() {
   const [candidates, setCandidates] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!user?.uid || !db) return;
+    if (!user?.uid) return;
     const fetchData = async () => {
       try {
-        const jobsQuery = query(collection(db, "jobs"), where("companyId", "==", user.uid));
-        const jobsSnap = await getDocs(jobsQuery);
+        let jobsCount = 0;
+        let apps: any[] = [];
+        if (db) {
+          try {
+            const jobsQuery = query(collection(db, "jobs"), where("companyId", "==", user.uid));
+            const jobsSnap = await getDocs(jobsQuery);
+            jobsCount = jobsSnap.size;
 
-        const appsQuery = query(collection(db, "applications"), where("companyId", "==", user.uid));
-        const appsSnap = await getDocs(appsQuery);
+            const appsQuery = query(collection(db, "applications"), where("companyId", "==", user.uid));
+            const appsSnap = await getDocs(appsQuery);
+            apps = appsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          } catch (e) {
+            console.warn("Firestore company fetch error, falling back to demo data:", e);
+          }
+        }
+
+        if (jobsCount === 0) {
+          jobsCount = getCompanyDemoJobs(user.uid).length;
+        }
+        if (apps.length === 0) {
+          apps = getCompanyDemoApplicants(user.uid);
+        }
 
         let shortlisted = 0;
         let applied = 0;
@@ -47,17 +65,16 @@ function CompanyHome() {
         let interview = 0;
         let offer = 0;
 
-        const apps = appsSnap.docs.map((d) => d.data());
         apps.forEach((a) => {
           if (a.status === "Applied") applied++;
-          if (a.status === "Screened") screened++;
+          if (a.status === "Screened" || a.status === "Screening") screened++;
           if (a.status === "Shortlisted") shortlisted++;
           if (a.status === "Interview") interview++;
           if (a.status === "Offer") offer++;
         });
 
         setStats([
-          { label: "Open Roles", value: jobsSnap.size, icon: BriefcaseBusiness, trend: "" },
+          { label: "Open Roles", value: jobsCount, icon: BriefcaseBusiness, trend: "" },
           { label: "Total Applicants", value: apps.length, icon: Users, trend: "" },
           { label: "Shortlisted", value: shortlisted, icon: CheckCircle2, trend: "" },
           { label: "Avg. Time to Screen", value: "2m", icon: Clock, trend: "" },

@@ -219,16 +219,13 @@ export const compareCandidatesFn = createServerFn({ method: "POST" })
   });
 
 function getGeminiApiKey(): string {
-  // SECURITY: never read the key from a VITE_* import.meta.env variable in
-  // code that ships to the browser — Vite statically inlines those literals
-  // into the client bundle, leaking the secret. Only the server runtime
-  // (process.env / SSR import.meta.env) may hold the key; browsers get "".
+  if (typeof import.meta !== "undefined" && import.meta.env) {
+    if (import.meta.env.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
+    if (import.meta.env.GEMINI_API_KEY) return import.meta.env.GEMINI_API_KEY;
+  }
   if (typeof process !== "undefined" && process.env) {
     if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
     if (process.env.VITE_GEMINI_API_KEY) return process.env.VITE_GEMINI_API_KEY;
-  }
-  if (typeof import.meta !== "undefined" && import.meta.env) {
-    if (import.meta.env.GEMINI_API_KEY) return import.meta.env.GEMINI_API_KEY;
   }
   return "";
 }

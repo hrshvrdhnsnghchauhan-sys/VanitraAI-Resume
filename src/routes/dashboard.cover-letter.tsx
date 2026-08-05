@@ -36,6 +36,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/services/firebase";
 import { exportCoverLetterPDF, exportCoverLetterDOCX } from "@/lib/cover-letter";
+import { getDemoResumeText } from "@/lib/demo-resume";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard/cover-letter")({
@@ -109,35 +110,35 @@ function CoverLetterPage() {
     if (!user?.uid) return;
     setLoadingResume(true);
     try {
-      if (!db) {
-        setHasResume(false);
-        return;
+      if (db) {
+        const snap = await getDoc(doc(db, "resumes", user.uid));
+        if (snap.exists()) {
+          const data = snap.data();
+          setHasResume(true);
+          const exp =
+            Array.isArray(data.experiences) || Array.isArray(data.experience)
+              ? (data.experiences || data.experience)
+                  .map(
+                    (e: any) =>
+                      `${e.role || ""}${e.company ? ` at ${e.company}` : ""}: ${e.detail || ""}`,
+                  )
+                  .filter(Boolean)
+                  .join("\n")
+              : "";
+          setResumeText(
+            [data.summary, exp, data.skills ? `Skills: ${data.skills}` : ""]
+              .filter(Boolean)
+              .join("\n\n"),
+          );
+          return;
+        }
       }
-      const snap = await getDoc(doc(db, "resumes", user.uid));
-      if (snap.exists()) {
-        const data = snap.data();
-        setHasResume(true);
-        const exp =
-          Array.isArray(data.experiences) || Array.isArray(data.experience)
-            ? (data.experiences || data.experience)
-                .map(
-                  (e: any) =>
-                    `${e.role || ""}${e.company ? ` at ${e.company}` : ""}: ${e.detail || ""}`,
-                )
-                .filter(Boolean)
-                .join("\n")
-            : "";
-        setResumeText(
-          [data.summary, exp, data.skills ? `Skills: ${data.skills}` : ""]
-            .filter(Boolean)
-            .join("\n\n"),
-        );
-      } else {
-        setHasResume(false);
-      }
+      setHasResume(true);
+      setResumeText(getDemoResumeText());
     } catch (err) {
-      console.warn("Failed to load resume:", err);
-      setHasResume(false);
+      console.warn("Failed to load resume, using demo fallback:", err);
+      setHasResume(true);
+      setResumeText(getDemoResumeText());
     } finally {
       setLoadingResume(false);
     }

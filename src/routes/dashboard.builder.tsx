@@ -37,6 +37,7 @@ import { useAuth } from "@/lib/auth";
 import { getAIProvider } from "@/ai/core";
 import { autosaveVersion } from "@/services/versions";
 import type { ResumeData } from "@/lib/resume-templates";
+import { exportResumeDOCX } from "@/lib/resume-export";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -224,8 +225,15 @@ function BuilderPage() {
         updatedAt: new Date().toISOString(),
       };
 
+      // Always save to localStorage first for immediate persistence
       try {
-        await setDoc(doc(db!, "resumes", user.uid), payload, { merge: true });
+        localStorage.setItem(`resume_${user.uid}`, JSON.stringify(payload));
+      } catch (err) {}
+
+      try {
+        if (db) {
+          await setDoc(doc(db, "resumes", user.uid), payload, { merge: true });
+        }
         // Additive: snapshot a version into the history (deduped — a no-op
         // when the content hash is unchanged, so no duplicate versions).
         const snapshot: ResumeData = {
@@ -248,8 +256,6 @@ function BuilderPage() {
           /* version snapshot is additive; failures fall back to local save */
         });
       } catch (e: any) {
-        // Fallback to local storage
-        localStorage.setItem(`resume_${user.uid}`, JSON.stringify(payload));
         console.warn("Cloud save failed (likely permissions), saved locally instead.");
       } finally {
         setIsSaving(false);
@@ -267,6 +273,57 @@ function BuilderPage() {
   const handleExportPDF = () => {
     window.print();
     toast.success("Resume exported to PDF");
+  };
+
+  const handleExportDOCX = async () => {
+    try {
+      await exportResumeDOCX(
+        {
+          name,
+          title,
+          email,
+          phone,
+          location: "",
+          website: "",
+          linkedin: "",
+          summary,
+          skills,
+          experiences: experiences.map((e) => ({
+            id: String(e.id),
+            role: e.role,
+            company: e.company,
+            period: "",
+            location: "",
+            bullets: e.detail
+              .split("\n")
+              .map((b) => b.replace(/^[•*\-\s]+/, "").trim())
+              .filter(Boolean),
+          })),
+          education: [],
+          projects: [],
+          certifications: [],
+          languages: [],
+        },
+        {
+          templateId: "classic-clean",
+          font: "calibri",
+          accent: "#2563eb",
+          pageSize: "a4",
+          fontSize: "normal",
+          lineSpacing: "normal",
+          sectionOrder: ["summary", "experience", "skills"],
+          hiddenSections: [],
+          dateAlign: "right",
+          showIcons: false,
+          experienceLayout: "standard",
+          skillStyle: "tags",
+        },
+      );
+      toast.success("Resume exported to DOCX");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to export DOCX");
+    }
   };
 
   const handleExportJSON = () => {
@@ -478,6 +535,9 @@ function BuilderPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              <Button variant="outline" onClick={handleExportDOCX}>
+                <Download className="h-4 w-4" /> Download DOCX
+              </Button>
               <Button variant="hero" onClick={handleExportPDF}>
                 <Download className="h-4 w-4" /> Download PDF
               </Button>

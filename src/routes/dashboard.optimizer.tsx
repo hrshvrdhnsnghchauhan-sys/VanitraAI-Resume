@@ -10,6 +10,14 @@ import { getAIProvider } from "@/ai/core";
 import { useAuth } from "@/lib/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/services/firebase";
+import { DEMO_RESUME } from "@/lib/demo-resume";
+
+type Section = {
+  key: string;
+  label: string;
+  before: string;
+  after: string;
+};
 
 export const Route = createFileRoute("/dashboard/optimizer")({
   component: OptimizerPage,
@@ -21,51 +29,55 @@ function OptimizerPage() {
   const [fetching, setFetching] = useState(true);
   const [hasResume, setHasResume] = useState(true);
   const [optimized, setOptimized] = useState(false);
-
-  const [sections, setSections] = useState([
-    {
-      key: "summary",
-      label: "Summary",
-      before: "",
-      after: "",
-    },
-    {
-      key: "experience",
-      label: "Experience",
-      before: "",
-      after: "",
-    },
-    {
-      key: "skills",
-      label: "Skills",
-      before: "",
-      after: "",
-    },
-  ]);
+  const [sections, setSections] = useState<Section[]>([]);
 
   useEffect(() => {
-    if (!user?.uid || !db) return;
+    if (!user?.uid) return;
     const fetchResume = async () => {
       try {
-        const resumeRef = doc(db, "resumes", user.uid);
-        const snap = await getDoc(resumeRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          setSections([
-            { key: "summary", label: "Summary", before: data.summary || "", after: "" },
-            {
-              key: "experience",
-              label: "Experience",
-              before: JSON.stringify(data.experiences || data.experience || []) || "",
-              after: "",
-            },
-            { key: "skills", label: "Skills", before: data.skills || "", after: "" },
-          ]);
-        } else {
-          setHasResume(false);
+        if (db) {
+          const resumeRef = doc(db, "resumes", user.uid);
+          const snap = await getDoc(resumeRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            setHasResume(true);
+            setSections([
+              { key: "summary", label: "Summary", before: data.summary || "", after: "" },
+              {
+                key: "experience",
+                label: "Experience",
+                before: JSON.stringify(data.experiences || data.experience || []) || "",
+                after: "",
+              },
+              { key: "skills", label: "Skills", before: data.skills || "", after: "" },
+            ]);
+            return;
+          }
         }
+        setHasResume(true);
+        setSections([
+          { key: "summary", label: "Summary", before: DEMO_RESUME.summary, after: "" },
+          {
+            key: "experience",
+            label: "Experience",
+            before: JSON.stringify(DEMO_RESUME.experiences),
+            after: "",
+          },
+          { key: "skills", label: "Skills", before: DEMO_RESUME.skills, after: "" },
+        ]);
       } catch (err) {
-        toast.error("Failed to load resume");
+        console.warn("Failed to load resume, using demo fallback:", err);
+        setHasResume(true);
+        setSections([
+          { key: "summary", label: "Summary", before: DEMO_RESUME.summary, after: "" },
+          {
+            key: "experience",
+            label: "Experience",
+            before: JSON.stringify(DEMO_RESUME.experiences),
+            after: "",
+          },
+          { key: "skills", label: "Skills", before: DEMO_RESUME.skills, after: "" },
+        ]);
       } finally {
         setFetching(false);
       }

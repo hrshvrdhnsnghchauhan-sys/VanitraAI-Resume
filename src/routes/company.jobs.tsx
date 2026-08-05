@@ -45,6 +45,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/services/firebase";
+import { getCompanyDemoJobs, saveCompanyDemoJobs } from "@/lib/company-demo-data";
 
 export const Route = createFileRoute("/company/jobs")({
   component: JobsPage,
@@ -67,12 +68,23 @@ function JobsPage() {
   const [type, setType] = useState("");
 
   const fetchJobs = async () => {
-    if (!user?.uid || !db) return;
+    if (!user?.uid) return;
     setLoading(true);
     try {
-      const q = query(collection(db, "jobs"), where("companyId", "==", user.uid));
-      const snap = await getDocs(q);
-      setJobs(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      let loaded: any[] = [];
+      if (db) {
+        try {
+          const q = query(collection(db, "jobs"), where("companyId", "==", user.uid));
+          const snap = await getDocs(q);
+          loaded = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        } catch (e) {
+          console.warn("Firestore fetch error, using demo fallback:", e);
+        }
+      }
+      if (loaded.length === 0) {
+        loaded = getCompanyDemoJobs(user.uid);
+      }
+      setJobs(loaded);
     } catch (err) {
       console.error(err);
       toast.error("Failed to load jobs");
@@ -138,31 +150,68 @@ function JobsPage() {
     e.preventDefault();
     if (!user) return toast.error("Must be logged in");
     try {
+      if (db) {
+        try {
+          if (editingJobId) {
+            await updateDoc(doc(db, "jobs", editingJobId), {
+              title,
+              location,
+              type,
+              description: jd,
+              skills,
+            });
+            toast.success("Job updated");
+          } else {
+            await addDoc(collection(db, "jobs"), {
+              companyId: user.uid,
+              companyName: user.name,
+              title,
+              location,
+              type,
+              description: jd,
+              skills,
+              createdAt: serverTimestamp(),
+            });
+            toast.success("Job published");
+          }
+          setIsDialogOpen(false);
+          resetForm();
+          fetchJobs();
+          return;
+        } catch (dbErr) {
+          console.warn("Firestore save error, saving locally:", dbErr);
+        }
+      }
+
+      // Local storage fallback for demo
+      let updatedJobs = [...jobs];
       if (editingJobId) {
-        await updateDoc(doc(db, "jobs", editingJobId), {
-          title,
-          location,
-          type,
-          description: jd,
-          skills,
-        });
+        updatedJobs = updatedJobs.map((j) =>
+          j.id === editingJobId
+            ? { ...j, title, location, type, description: jd, skills }
+            : j
+        );
         toast.success("Job updated");
       } else {
-        await addDoc(collection(db, "jobs"), {
+        const newJob = {
+          id: `comp-job-${Date.now()}`,
           companyId: user.uid,
-          companyName: user.name,
+          companyName: user.name || "Demo Company",
           title,
           location,
           type,
           description: jd,
           skills,
-          createdAt: serverTimestamp(),
-        });
+          createdAt: new Date().toISOString(),
+          status: "active",
+        };
+        updatedJobs = [newJob, ...updatedJobs];
         toast.success("Job published");
       }
+      saveCompanyDemoJobs(user.uid, updatedJobs);
+      setJobs(updatedJobs);
       setIsDialogOpen(false);
       resetForm();
-      fetchJobs();
     } catch (error) {
       console.error(error);
       toast.error("Failed to save job");
@@ -172,9 +221,20 @@ function JobsPage() {
   const deleteJob = async (id: string) => {
     if (!confirm("Are you sure you want to delete this job?")) return;
     try {
-      await deleteDoc(doc(db, "jobs", id));
+      if (db) {
+        try {
+          await deleteDoc(doc(db, "jobs", id));
+          toast.success("Job deleted");
+          fetchJobs();
+          return;
+        } catch (dbErr) {
+          console.warn("Firestore delete error, deleting locally:", dbErr);
+        }
+      }
+      const updatedJobs = jobs.filter((j) => j.id !== id);
+      saveCompanyDemoJobs(user.uid, updatedJobs);
+      setJobs(updatedJobs);
       toast.success("Job deleted");
-      fetchJobs();
     } catch (err) {
       toast.error("Failed to delete job");
     }

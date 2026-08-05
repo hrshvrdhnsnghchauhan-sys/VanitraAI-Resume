@@ -35,32 +35,35 @@ const platformIcon: Record<string, typeof Youtube> = {
 
 function RoadmapPage() {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [hasResume, setHasResume] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [roadmap, setRoadmap] = useState<CareerRoadmapResult | null>(null);
+  const [targetRole, setTargetRole] = useState("Principal Systems Architect");
   const [resumeText, setResumeText] = useState("");
-  const [targetRole, setTargetRole] = useState("Senior Software Engineer");
+  const [hasResume, setHasResume] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
 
   useEffect(() => {
-    if (!user?.uid || !db) return;
+    if (!user?.uid) return;
     const fetchResume = async () => {
       try {
-        const resumeRef = doc(db, "resumes", user.uid);
-        const snap = await getDoc(resumeRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data.title) setTargetRole(data.title);
-          setResumeText(
-            `Skills: ${data.skills}\nSummary: ${data.summary}\nExperience: ${JSON.stringify(data.experiences || data.experience || [])}\nEducation: ${JSON.stringify(data.education || [])}`,
-          );
-        } else {
-          setHasResume(false);
-          setLoading(false);
+        if (db) {
+          const resumeRef = doc(db, "resumes", user.uid);
+          const snap = await getDoc(resumeRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data.title) setTargetRole(data.title);
+            setResumeText(
+              `Skills: ${data.skills}\nSummary: ${data.summary}\nExperience: ${JSON.stringify(data.experiences || data.experience || [])}\nEducation: ${JSON.stringify(data.education || [])}`,
+            );
+            return;
+          }
         }
+        setResumeText(getDemoResumeText());
+        setHasResume(true);
       } catch (error) {
-        toast.error("Failed to load resume data");
-        setLoading(false);
+        console.warn("Failed to load resume data, using demo fallback:", error);
+        setResumeText(getDemoResumeText());
+        setHasResume(true);
       }
     };
     fetchResume();

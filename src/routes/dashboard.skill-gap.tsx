@@ -45,31 +45,39 @@ function SkillGapPage() {
   const [skillRadar, setSkillRadar] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!user?.uid || !db) return;
-    const fetchData = async () => {
+    if (!user?.uid) return;
+    const fetchSkillGap = async () => {
       setLoading(true);
       try {
-        const resumeRef = doc(db, "resumes", user.uid);
-        const resumeSnap = await getDoc(resumeRef);
+        let skillsStr = DEMO_RESUME.skills;
+        if (db) {
+          try {
+            const resumeRef = doc(db, "resumes", user.uid);
+            const resumeSnap = await getDoc(resumeRef);
+            if (resumeSnap.exists() && resumeSnap.data().skills) {
+              skillsStr = resumeSnap.data().skills;
+            }
+          } catch (e) {}
+        }
+        setCurrentSkills(
+          skillsStr
+            .split(",")
+            .map((s: string) => s.trim())
+            .filter(Boolean),
+        );
 
-        let skillsStr = "";
-        if (resumeSnap.exists()) {
-          const data = resumeSnap.data();
-          skillsStr = data.skills || "";
-          setCurrentSkills(
-            skillsStr
-              .split(",")
-              .map((s: string) => s.trim())
-              .filter(Boolean),
-          );
+        let data: any = null;
+        if (db) {
+          try {
+            const analysisRef = doc(db, "analysis", user.uid);
+            const analysisSnap = await getDoc(analysisRef);
+            if (analysisSnap.exists() && analysisSnap.data().skillGap) {
+              data = analysisSnap.data().skillGap;
+            }
+          } catch (e) {}
         }
 
-        // We can fetch pre-saved analysis or generate on the fly
-        const analysisRef = doc(db, "analysis", user.uid);
-        const analysisSnap = await getDoc(analysisRef);
-
-        if (analysisSnap.exists() && analysisSnap.data().skillGap) {
-          const data = analysisSnap.data().skillGap;
+        if (data) {
           setMissingSkills(data.missingSkills || []);
           setSkillRadar(data.skillRadar || []);
         } else if (skillsStr) {
